@@ -33,8 +33,8 @@ class ArchivalHospitalAgent:
                     "tier": "TIER_1_BEDSIDE",
                     "tool": "trigger_inroom_reassurance",
                     "timestamp": now,
-                    "voice_prompt": f"Mr. {last_name}, you're safe. Nurse Sarah is on her way to your bedside right now to help you. Take a gentle breath, we're right here with you.",
-                    "clinical_objective": "ICU Delirium De-escalation: Halt life-support line self-extubation before airway dislodgement."
+                    "voice_prompt": f"Mr. {last_name}, you're safe. Nurse Sarah is on her way to your bedside right now.",
+                    "clinical_objective": "Immediate audio orientation and reassurance."
                 }
                 dispatches.append(t1)
                 

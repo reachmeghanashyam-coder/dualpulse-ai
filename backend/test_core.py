@@ -46,7 +46,7 @@ def test_life_support_line_extubation_interception():
     dispatches = decision["dispatches"]
     assert any(d["tier"] == "TIER_1_BEDSIDE" for d in dispatches)
     t1 = next(d for d in dispatches if d["tier"] == "TIER_1_BEDSIDE")
-    assert "you're safe. Nurse Sarah is on her way" in t1["voice_prompt"]
+    assert "Nurse Sarah is on her way to your bedside right now" in t1["voice_prompt"]
     
     # Check that Tier 2 STAT Nurse Dispatch was transmitted
     assert any(d["tier"] == "TIER_2_WARD_CONSOLE" for d in dispatches)
