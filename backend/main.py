@@ -10,7 +10,7 @@ import time
 from vision_engine import ThreeTierClinicalVisionEngine
 from agent_core import ArchivalHospitalAgent
 
-app = FastAPI(title="DualPulse AI Clinical Triage System", version="3.0.0")
+app = FastAPI(title="DualPulse AI Clinical Triage System", version="3.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -26,10 +26,10 @@ agent = ArchivalHospitalAgent(room_id="ICU_BED_04")
 class PatientProfile(BaseModel):
     patient_id: str = "PT-8821"
     name: str = "Robert Davis"
-    age: int = 68
+    age: 68
     diagnosis: str = "Post-Stroke Recovery / Neurological Care"
     acuity_mode: str = "HIGH_ACUITY_ICU"  # "HIGH_ACUITY_ICU" or "STEP_DOWN_RECOVERY"
-    diet: str = "Diabetic / Soft Texture"
+    diet: str = "NPO (Strict Fasting - Post-Op)"
     allergies: str = "Penicillin, Latex"
     medication_schedule: str = "Warfarin 5mg @ 22:00, Metoprolol 25mg @ 08:00"
     fall_risk: str = "HIGH"
@@ -41,7 +41,7 @@ class AcuityUpdate(BaseModel):
     acuity_mode: str
 
 class SimulationCommand(BaseModel):
-    command: str  # "NORMAL", "SEIZURE", "FALL", "AGITATION", "TURN_DUE", "RESET"
+    command: str  # "NORMAL", "EXTUBATION", "SEIZURE", "FALL", "AGITATION", "RESET"
 
 sim_state = {"event": "NONE"}
 
@@ -52,6 +52,7 @@ def read_root():
         "patient": active_patient.name,
         "acuity_mode": active_patient.acuity_mode,
         "tripwire_perimeter": engine.bed_perimeter_icu if active_patient.acuity_mode == "HIGH_ACUITY_ICU" else engine.bed_perimeter_recovery,
+        "line_integrity": engine.line_integrity_status,
         "status": active_patient.status
     }
 
@@ -66,20 +67,19 @@ def set_acuity_mode(update: AcuityUpdate):
     engine.set_acuity_mode(update.acuity_mode)
     return {"status": "UPDATED", "acuity_mode": active_patient.acuity_mode}
 
-@app.post("/api/patient/turn")
-def log_patient_turn():
-    """Nurse manual repositioning action: resets the 120-minute bedsore clock (Part 1)."""
-    engine.log_patient_turn()
+@app.post("/api/patient/line_secure")
+def secure_lines():
+    """Nurse manual bedside intervention: secures lines and resets extubation risk."""
+    engine.reset_line_security()
     return {
-        "status": "TURN_LOGGED",
-        "total_turns_logged": engine.total_turns_logged,
-        "time_since_last_turn": engine.time_since_last_turn
+        "status": "LINE_SECURED",
+        "line_integrity": engine.line_integrity_status,
+        "total_interventions_logged": engine.total_interventions_logged
     }
 
 @app.post("/api/patient/discharge")
 def discharge_patient():
     """Discharges patient, compiles final EHR dossier with SHA-256 hash, and purges session memory."""
-    # Process current synthetic frame to get latest telemetry state
     dummy_frame = np.full((480, 640, 3), 120, dtype=np.uint8)
     latest_telemetry = engine.process_frame(dummy_frame)
     report = agent.compile_archival_discharge_dossier(active_patient.dict(), latest_telemetry)
@@ -99,14 +99,14 @@ def discharge_patient():
 
 @app.post("/api/eval/simulate")
 def set_simulation(cmd: SimulationCommand):
-    """1-Click Evaluation Mode for Judges: Normal, Seizure, Fall, Agitation, Turn Due."""
-    if cmd.command in ["SEIZURE", "FALL", "AGITATION"]:
+    """1-Click Evaluation Mode for Judges: Normal, Extubation, Seizure, Fall, Agitation."""
+    if cmd.command == "EXTUBATION":
+        sim_state["event"] = "EXTUBATION_ATTEMPT"
+    elif cmd.command in ["SEIZURE", "FALL", "AGITATION"]:
         sim_state["event"] = cmd.command
-    elif cmd.command == "TURN_DUE":
-        sim_state["event"] = "NONE"
-        engine.time_since_last_turn = 7300.0  # Force turn clock > 120 mins
     else:
         sim_state["event"] = "NONE"
+        engine.reset_line_security()
         engine.active_breach_type = "NONE"
         engine.incident_duration = 0.0
         
