@@ -25,16 +25,16 @@ class ArchivalHospitalAgent:
         
         # 1. PART 1 ACTION: Life-Support Tube Extubation Intercept
         if breach in ["UNPLANNED_EXTUBATION_RISK", "CENTRAL_LINE_DISLODGEMENT_RISK"]:
-            if now - self.last_dispatch_time > 4.0:
+            if now - self.last_dispatch_time > 3.0:
                 self.last_dispatch_time = now
                 
-                # Tier 1 In-Room Bedside De-escalation & Reassurance (Rule #1)
+                # Tier 1 In-Room Bedside Action: High-Frequency Warning Pulse Chime (NOT talking voice)
                 t1 = {
                     "tier": "TIER_1_BEDSIDE",
-                    "tool": "trigger_inroom_reassurance",
+                    "action_type": "BEDSIDE_TONE_PULSE",
+                    "frequency_hz": 880,
                     "timestamp": now,
-                    "voice_prompt": f"Mr. {last_name}, you're safe. Nurse Sarah is on her way to your bedside right now.",
-                    "clinical_objective": "Immediate audio orientation and reassurance."
+                    "clinical_objective": "Immediate local proximity deterrent chime to halt unconscious hand reflex."
                 }
                 dispatches.append(t1)
                 
@@ -60,21 +60,49 @@ class ArchivalHospitalAgent:
                     "breach_type": breach,
                     "confidence": 0.982,
                     "hand_coordinates": line_sentinel.get("hand_centroid"),
-                    "action_taken": "Tier 1 Bedside Audio De-escalation + Tier 2 Nurse STAT Dispatch",
+                    "action_taken": "Tier 1 Bedside Deterrent Chime + Tier 2 Nurse STAT Dispatch",
                     "patient_id": patient.get("patient_id")
                 })
 
-        # 2. PART 3 ACTION: Acute Seizures & Bed-Falls
+        # 2. PART 2 ACTION: Bed Exit Early Warning (Patient climbing out of bed)
+        elif breach == "BED_EXIT_ATTEMPT":
+            if now - self.last_dispatch_time > 4.0:
+                self.last_dispatch_time = now
+                
+                t1 = {
+                    "tier": "TIER_1_BEDSIDE",
+                    "action_type": "BEDSIDE_VOICE_PROMPT",
+                    "voice_prompt": f"Mr. {last_name}, please remain in bed. Nurse Sarah is coming to assist you.",
+                    "timestamp": now,
+                    "clinical_objective": "Calm disoriented patient and halt unassisted fall before standing."
+                }
+                dispatches.append(t1)
+                
+                t2 = {
+                    "tier": "TIER_2_WARD_CONSOLE",
+                    "tool": "dispatch_nurse_stat",
+                    "timestamp": now,
+                    "priority": "HIGH_FALL_RISK",
+                    "assigned_nurse": "Nurse Sarah Jenkins, RN (Lead ICU Staff)",
+                    "payload": {
+                        "room_id": self.room_id,
+                        "breach": breach,
+                        "clinical_action": "Bed-Exit Intervene: Patient unassisted transfer attempt."
+                    }
+                }
+                dispatches.append(t2)
+
+        # 3. PART 3 ACTION: Acute Seizures & Bed-Falls (Floor impact / convulsions)
         elif breach in ["SEIZURE_CONVULSION", "BED_FALL_COLLAPSE"]:
             if now - self.last_dispatch_time > 5.0:
                 self.last_dispatch_time = now
                 
                 t1 = {
                     "tier": "TIER_1_BEDSIDE",
-                    "tool": "trigger_inroom_reassurance",
+                    "action_type": "BEDSIDE_VOICE_PROMPT",
+                    "voice_prompt": f"Mr. {last_name}, you're safe. Nurse Sarah is on her way to your bedside right now.",
                     "timestamp": now,
-                    "voice_prompt": f"Mr. {last_name}, you're safe. Nurse Sarah is on her way to your bedside right now. Help is right here.",
-                    "clinical_objective": "Immediate audio orientation and calming feedback."
+                    "clinical_objective": "Immediate audio orientation and calming feedback upon impact."
                 }
                 dispatches.append(t1)
                 
@@ -98,7 +126,7 @@ class ArchivalHospitalAgent:
                     "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now)),
                     "breach_type": breach,
                     "confidence": 0.991,
-                    "action_taken": "Tier 1 Bedside Voice Reassurance + Tier 2 Nurse STAT Dispatch",
+                    "action_taken": "Tier 1 Bedside Voice + Tier 2 Nurse STAT Dispatch",
                     "patient_id": patient.get("patient_id")
                 })
                 

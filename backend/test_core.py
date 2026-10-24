@@ -42,11 +42,12 @@ def test_life_support_line_extubation_interception():
     }
     decision = agent.evaluate(telemetry, patient)
     
-    # Check that reassuring bedside voice was triggered
+    # Check that high-frequency bedside chime was triggered (NOT conversational voice)
     dispatches = decision["dispatches"]
     assert any(d["tier"] == "TIER_1_BEDSIDE" for d in dispatches)
     t1 = next(d for d in dispatches if d["tier"] == "TIER_1_BEDSIDE")
-    assert "Nurse Sarah is on her way to your bedside right now" in t1["voice_prompt"]
+    assert t1["action_type"] == "BEDSIDE_TONE_PULSE"
+    assert t1["frequency_hz"] == 880
     
     # Check that Tier 2 STAT Nurse Dispatch was transmitted
     assert any(d["tier"] == "TIER_2_WARD_CONSOLE" for d in dispatches)
