@@ -1,0 +1,24 @@
+{
+  "benchmark_timestamp": 1792851414.575556,
+  "opencv_version": "5.0.0",
+  "workload": "Sub-pixel Phase Correlation + Direct Least-Squares Ellipse",
+  "tested_frame_resolution": "1920x1080 (1080p)",
+  "x86_baseline": {
+    "avg_latency_ms": 14.08,
+    "throughput_fps": 71.0,
+    "cpu_utilization_pct": 82.5,
+    "concurrent_incubator_streams_per_node": 7
+  },
+  "aws_graviton_cool_kleidicv": {
+    "avg_latency_ms": 3.93,
+    "throughput_fps": 253.5,
+    "cpu_utilization_pct": 26.4,
+    "concurrent_incubator_streams_per_node": 28,
+    "cost_per_incubator_per_day_usd": 0.038
+  },
+  "efficiency_multipliers": {
+    "latency_reduction_pct": 72.1,
+    "cpu_load_reduction_pct": 68.0,
+    "concurrent_capacity_gain": "4.0x"
+  }
+}
