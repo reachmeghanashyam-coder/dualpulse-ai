@@ -10,11 +10,10 @@ import {
   CheckCircle,
   Loader2,
   Camera,
-  Moon,
 } from "lucide-react";
 
 export default function Home() {
-  const [telemetry, setTelemetry] = useState<any>({
+  const [telemetry, setTelemetry] = useState<Record<string, unknown>>({
     status: "PATIENT_REST_NORMAL",
     breach_type: "NONE",
     kinematics: { drop_pct: 0.0, height_loss_pct: 0.0, is_fall: false, is_abstained: false },
@@ -32,13 +31,13 @@ export default function Home() {
 
   const [activeClip, setActiveClip] = useState<string>("FALL_STANDING");
   const [liveStreamFrame, setLiveStreamFrame] = useState<string | null>(null);
-  const [backendConnected, setBackendConnected] = useState<boolean>(false);
+  const [, setBackendConnected] = useState<boolean>(false);
   const [coolDrawerOpen, setCoolDrawerOpen] = useState<boolean>(false);
-  const [coolBenchmarkData, setCoolBenchmarkData] = useState<any>(null);
+  const [coolBenchmarkData, setCoolBenchmarkData] = useState<Record<string, unknown> | null>(null);
   const [ehrModalOpen, setEhrModalOpen] = useState<boolean>(false);
-  const [ehrData, setEhrData] = useState<any>(null);
+  const [ehrData, setEhrData] = useState<Record<string, unknown> | null>(null);
 
-  const audioCtxRef = useRef<any>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
   const lastAudioTriggerRef = useRef<number>(0);
 
   const playChime = () => {
@@ -47,7 +46,8 @@ export default function Home() {
       if (now - lastAudioTriggerRef.current < 3000) return;
       lastAudioTriggerRef.current = now;
       if (!audioCtxRef.current) {
-        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        audioCtxRef.current = new AudioContextClass();
       }
       const ctx = audioCtxRef.current;
       if (ctx.state === "suspended") ctx.resume();
@@ -101,12 +101,14 @@ export default function Home() {
             playChime();
             speakReassurance("Nurse Sarah has been alerted. Assistance is on the way.");
           }
-        } catch (err) {}
+        } catch {
+          // Ignore parse errors on transient frames
+        }
       };
       ws.onerror = () => setBackendConnected(false);
       ws.onclose = () => setBackendConnected(false);
     } catch {
-      setBackendConnected(false);
+      // Ignore initial connection error
     }
 
     return () => {
@@ -155,8 +157,7 @@ export default function Home() {
   };
 
   const isFall = telemetry.status === "CRITICAL_INTERVENTION_REQUIRED";
-  const cl = telemetry.closed_loop_vision || {};
-  const kin = telemetry.kinematics || {};
+  const kin = (telemetry.kinematics as Record<string, unknown>) || {};
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-[#030407] text-[#F5F5F7] font-sans flex flex-col justify-between px-6 py-4 box-border">
@@ -166,7 +167,7 @@ export default function Home() {
         <div className="flex items-center gap-2">
           <span className="h-2 w-2 rounded-full bg-[#00E5FF] shadow-[0_0_8px_#00E5FF] animate-pulse" />
           <span className="text-sm font-bold tracking-[0.14em] uppercase text-white">DUALPULSE AI</span>
-          <span className="text-xs text-zinc-500 font-mono ml-1">// REAL-FOOTAGE PATIENT SENTINEL</span>
+          <span className="text-xs text-zinc-500 font-mono ml-1">{"// REAL-FOOTAGE PATIENT SENTINEL"}</span>
         </div>
 
         <button
