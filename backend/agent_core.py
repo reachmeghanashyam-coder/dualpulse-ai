@@ -138,7 +138,7 @@ class ArchivalHospitalAgent:
         }
         
     def compile_archival_discharge_dossier(self, patient: Dict[str, Any], telemetry: Dict[str, Any]) -> Dict[str, Any]:
-        """Compiles permanent hospital archival discharge record (Rule #12)."""
+        """Compiles verifiable shift event audit record with SHA-256 seal (Disciplined Review Standard)."""
         now_str = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         raw_payload = json.dumps(self.escalation_log, sort_keys=True)
         sha256_hash = hashlib.sha256(raw_payload.encode()).hexdigest()
@@ -146,9 +146,9 @@ class ArchivalHospitalAgent:
         line_sentinel = telemetry.get("line_sentinel", {})
         
         return {
-            "document_type": "CertifiedHospitalArchivalDischargeDossier",
-            "document_id": f"archival-{self.room_id.lower()}-{int(time.time())}",
-            "status": "FINAL_ARCHIVED_LEGAL",
+            "document_type": "VerifiedShiftEventAuditRecord",
+            "document_id": f"audit-{self.room_id.lower()}-{int(time.time())}",
+            "status": "FINAL_SHIFT_AUDIT_LOG",
             "hospital_unit": "Critical Care ICU Pod B",
             "room_id": self.room_id,
             "generated_at": now_str,
@@ -167,7 +167,8 @@ class ArchivalHospitalAgent:
             "cryptographic_proof": {
                 "algorithm": "SHA-256",
                 "hash": f"sha256:{sha256_hash}",
-                "legal_standing": "IMMUTABLE_CLINICAL_AUDIT_TRAIL"
+                "audit_integrity": "CRYPTOGRAPHIC_DIGEST_VERIFIED",
+                "note": "Event audit record with SHA-256 integrity verification, recording timestamps, breach coordinates, and nurse acknowledgment."
             },
             "archival_action": "LOCAL_SESSION_MEMORY_PURGED_CLEARED"
         }

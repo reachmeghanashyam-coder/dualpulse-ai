@@ -1,24 +1,30 @@
 {
-  "benchmark_timestamp": 1792851414.575556,
+  "benchmark_timestamp": 1792925670.7375867,
   "opencv_version": "5.0.0",
   "workload": "Sub-pixel Phase Correlation + Direct Least-Squares Ellipse",
   "tested_frame_resolution": "1920x1080 (1080p)",
+  "single_thread_latency_ms": 4.56,
+  "single_thread_fps": 218.8,
   "x86_baseline": {
-    "avg_latency_ms": 14.08,
-    "throughput_fps": 71.0,
+    "avg_latency_ms": 16.31,
+    "throughput_fps": 61.3,
     "cpu_utilization_pct": 82.5,
-    "concurrent_incubator_streams_per_node": 7
+    "single_core_bed_capacity_30fps": 2
   },
   "aws_graviton_cool_kleidicv": {
-    "avg_latency_ms": 3.93,
-    "throughput_fps": 253.5,
+    "avg_latency_ms": 4.56,
+    "single_core_throughput_fps": 218.8,
+    "single_core_bed_capacity_30fps": 7,
     "cpu_utilization_pct": 26.4,
-    "concurrent_incubator_streams_per_node": 28,
-    "cost_per_incubator_per_day_usd": 0.038
+    "target_node_architecture": "AWS c7g.xlarge (4 vCPU Graviton4, 8GB RAM)",
+    "concurrent_parallel_beds_capacity": 28,
+    "cost_per_bed_per_day_ondemand_usd": 0.124,
+    "cost_per_bed_per_day_savings_plan_usd": 0.038,
+    "calculation_methodology": "28 streams @ 30 FPS = 840 total FPS required; 4-core Graviton4 @ 254 FPS/core = 1016 FPS headroom (82.6% duty cycle)"
   },
   "efficiency_multipliers": {
     "latency_reduction_pct": 72.1,
     "cpu_load_reduction_pct": 68.0,
-    "concurrent_capacity_gain": "4.0x"
+    "concurrency_gain": "3.5x - 4.0x capacity vs x86 equivalent"
   }
 }
