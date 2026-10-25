@@ -43,7 +43,15 @@ class AcuityUpdate(BaseModel):
 class SimulationCommand(BaseModel):
     command: str  # "NORMAL", "EXTUBATION", "SEIZURE", "FALL", "AGITATION", "RESET"
 
-sim_state = {"event": "NONE"}
+class VideoSourceCommand(BaseModel):
+    source: str  # "SIMULATION" or "WEBCAM"
+
+sim_state = {
+    "event": "NONE",
+    "video_source": "SIMULATION"
+}
+
+webcam_cap = None
 
 @app.get("/")
 def read_root():
@@ -97,6 +105,26 @@ def discharge_patient():
         "discharge_dossier": report
     }
 
+@app.post("/api/video/source")
+def set_video_source(cmd: VideoSourceCommand):
+    """Switch video feed between synthetic clinical simulation and live local USB/Webcam feed."""
+    global webcam_cap
+    sim_state["video_source"] = cmd.source
+    
+    if cmd.source == "WEBCAM":
+        if webcam_cap is None or not webcam_cap.isOpened():
+            webcam_cap = cv2.VideoCapture(0)
+    else:
+        if webcam_cap is not None and webcam_cap.isOpened():
+            webcam_cap.release()
+            webcam_cap = None
+            
+    return {
+        "status": "SOURCE_UPDATED",
+        "video_source": sim_state["video_source"],
+        "camera_ready": bool(webcam_cap and webcam_cap.isOpened()) if cmd.source == "WEBCAM" else True
+    }
+
 @app.post("/api/eval/simulate")
 def set_simulation(cmd: SimulationCommand):
     """1-Click Evaluation Mode for Judges: Normal, Extubation, Seizure, Fall, Agitation."""
@@ -134,25 +162,35 @@ async def websocket_telemetry(websocket: WebSocket):
     try:
         while True:
             frame_idx += 1
-            frame = np.full((h, w, 3), 20, dtype=np.uint8)
+            global webcam_cap
             
-            # Position simulation based on event
-            if sim_state["event"] == "SEIZURE":
-                shake_x = int(np.sin(frame_idx * 1.5) * 18)
-                shake_y = int(np.cos(frame_idx * 1.5) * 18)
-                px, py = 320 + shake_x, 240 + shake_y
-            elif sim_state["event"] == "FALL":
-                px, py = 320, 440
-            elif sim_state["event"] == "AGITATION":
-                px = 320 + int(np.sin(frame_idx * 0.4) * 22)
-                py = 240 + int(np.cos(frame_idx * 0.4) * 8)
+            # Choose frame source: live physical camera vs synthetic simulation
+            if sim_state["video_source"] == "WEBCAM" and webcam_cap is not None and webcam_cap.isOpened():
+                ret, live_frame = webcam_cap.read()
+                if ret and live_frame is not None:
+                    frame = cv2.resize(live_frame, (w, h))
+                else:
+                    frame = np.full((h, w, 3), 20, dtype=np.uint8)
             else:
-                px, py = 320, 240
+                frame = np.full((h, w, 3), 20, dtype=np.uint8)
                 
-            # Draw synthetic patient & bed frame
-            cv2.rectangle(frame, (120, 90), (520, 390), (50, 50, 25), 2)
-            cv2.ellipse(frame, (px, py), (70, 110), 0, 0, 360, (180, 160, 140), -1)
-            cv2.circle(frame, (px, py - 90), 40, (200, 180, 160), -1)
+                # Position simulation based on event
+                if sim_state["event"] == "SEIZURE":
+                    shake_x = int(np.sin(frame_idx * 1.5) * 18)
+                    shake_y = int(np.cos(frame_idx * 1.5) * 18)
+                    px, py = 320 + shake_x, 240 + shake_y
+                elif sim_state["event"] == "FALL":
+                    px, py = 320, 440
+                elif sim_state["event"] == "AGITATION":
+                    px = 320 + int(np.sin(frame_idx * 0.4) * 22)
+                    py = 240 + int(np.cos(frame_idx * 0.4) * 8)
+                else:
+                    px, py = 320, 240
+                    
+                # Draw synthetic patient & bed frame
+                cv2.rectangle(frame, (120, 90), (520, 390), (50, 50, 25), 2)
+                cv2.ellipse(frame, (px, py), (70, 110), 0, 0, 360, (180, 160, 140), -1)
+                cv2.circle(frame, (px, py - 90), 40, (200, 180, 160), -1)
             
             # 1. OpenCV 5 Adaptive Vision Engine
             telemetry = engine.process_frame(frame, simulated_event=sim_state["event"])
