@@ -31,7 +31,7 @@ export default function Home() {
 
   const [activeClip, setActiveClip] = useState<string>("FALL_STANDING");
   const [liveStreamFrame, setLiveStreamFrame] = useState<string | null>(null);
-  const [, setBackendConnected] = useState<boolean>(false);
+  const [backendConnected, setBackendConnected] = useState<boolean>(false);
   const [coolDrawerOpen, setCoolDrawerOpen] = useState<boolean>(false);
   const [coolBenchmarkData, setCoolBenchmarkData] = useState<Record<string, unknown> | null>(null);
   const [ehrModalOpen, setEhrModalOpen] = useState<boolean>(false);
