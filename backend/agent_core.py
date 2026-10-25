@@ -25,7 +25,7 @@ class ArchivalHospitalAgent:
         
         # 1. PART 1 ACTION: Life-Support Tube Extubation Intercept
         if breach in ["UNPLANNED_EXTUBATION_RISK", "CENTRAL_LINE_DISLODGEMENT_RISK"]:
-            if now - self.last_dispatch_time > 3.0:
+            if now - self.last_dispatch_time > 8.0:
                 self.last_dispatch_time = now
                 
                 # Tier 1 In-Room Bedside Action: High-Frequency Warning Pulse Chime (NOT talking voice)
@@ -66,7 +66,7 @@ class ArchivalHospitalAgent:
 
         # 2. PART 2 ACTION: Bed Exit Early Warning (Patient climbing out of bed)
         elif breach == "BED_EXIT_ATTEMPT":
-            if now - self.last_dispatch_time > 4.0:
+            if now - self.last_dispatch_time > 8.0:
                 self.last_dispatch_time = now
                 
                 t1 = {
@@ -94,7 +94,7 @@ class ArchivalHospitalAgent:
 
         # 3. PART 3 ACTION: Acute Seizures & Bed-Falls (Floor impact / convulsions)
         elif breach in ["SEIZURE_CONVULSION", "BED_FALL_COLLAPSE"]:
-            if now - self.last_dispatch_time > 5.0:
+            if now - self.last_dispatch_time > 8.0:
                 self.last_dispatch_time = now
                 
                 t1 = {
