@@ -25,12 +25,12 @@ export default function Home() {
       tools_executed: ["cv2.createCLAHE", "cv2.bilateralFilter"],
       total_falls_detected: 0,
       total_false_alarms_abstained: 0,
-      open_loop_comparison: "Awaiting patient movement...",
+      open_loop_comparison: "Monitoring patient position...",
     },
     agent: { dispatches: [] },
   });
 
-  const [activeClip, setActiveClip] = useState<string>("BED_FALL_NIGHT");
+  const [activeClip, setActiveClip] = useState<string>("FALL_CHAIR");
   const [liveStreamFrame, setLiveStreamFrame] = useState<string | null>(null);
   const [backendConnected, setBackendConnected] = useState<boolean>(false);
   const [coolDrawerOpen, setCoolDrawerOpen] = useState<boolean>(false);
@@ -154,12 +154,12 @@ export default function Home() {
   return (
     <div className="h-screen w-screen overflow-hidden bg-[#030407] text-[#F5F5F7] font-sans flex flex-col justify-between px-6 py-4 box-border">
       
-      {/* 1. MINIMAL HEADER */}
+      {/* 1. HEADER */}
       <header className="w-full max-w-6xl mx-auto flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="h-2 w-2 rounded-full bg-[#00E5FF] shadow-[0_0_8px_#00E5FF] animate-pulse" />
           <span className="text-sm font-bold tracking-[0.14em] uppercase text-white">DUALPULSE AI</span>
-          <span className="text-xs text-zinc-500 font-mono ml-1">// PATIENT BED FALL SENTINEL</span>
+          <span className="text-xs text-zinc-500 font-mono ml-1">// REAL-FOOTAGE PATIENT SENTINEL</span>
         </div>
 
         <button
@@ -171,36 +171,36 @@ export default function Home() {
         </button>
       </header>
 
-      {/* 2. CHASSIS STAGE */}
+      {/* 2. MAIN WORKSPACE */}
       <div className="w-full max-w-6xl mx-auto flex-1 max-h-[82vh] rounded-2xl bg-[#0b0d14]/90 border border-white/[0.08] p-4 shadow-[0_0_50px_rgba(0,0,0,0.8)] backdrop-blur-xl flex flex-col justify-between gap-3 box-border">
         
-        {/* SELECTOR BAR: THE 2 REAL BED FALL SCENARIOS */}
+        {/* SELECTOR BAR */}
         <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
           <div className="flex items-center gap-2">
             <span className="text-xs font-mono uppercase text-zinc-400 tracking-wider">Test Fall:</span>
             
             <button
-              onClick={() => handleSelectClip("BED_FALL_NIGHT")}
+              onClick={() => handleSelectClip("FALL_CHAIR")}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 border ${
-                activeClip === "BED_FALL_NIGHT"
-                  ? "bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.25)]"
-                  : "bg-white/[0.02] text-zinc-300 border-white/[0.06] hover:text-white"
-              }`}
-            >
-              <Moon className="h-3.5 w-3.5 text-cyan-400" />
-              <span>1. Overnight Bed-to-Floor Fall</span>
-            </button>
-
-            <button
-              onClick={() => handleSelectClip("BED_FALL_CHAIR")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 border ${
-                activeClip === "BED_FALL_CHAIR"
+                activeClip === "FALL_CHAIR"
                   ? "bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.25)]"
                   : "bg-white/[0.02] text-zinc-300 border-white/[0.06] hover:text-white"
               }`}
             >
               <ShieldAlert className="h-3.5 w-3.5 text-rose-400" />
-              <span>2. Bedside Chair Collapse</span>
+              <span>1. Bedside Chair Collapse (4.3s)</span>
+            </button>
+
+            <button
+              onClick={() => handleSelectClip("FALL_SUDDEN")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 border ${
+                activeClip === "FALL_SUDDEN"
+                  ? "bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.25)]"
+                  : "bg-white/[0.02] text-zinc-300 border-white/[0.06] hover:text-white"
+              }`}
+            >
+              <ShieldAlert className="h-3.5 w-3.5 text-rose-400" />
+              <span>2. Sudden Floor Collapse (2.6s)</span>
             </button>
 
             <button
@@ -216,7 +216,7 @@ export default function Home() {
             </button>
           </div>
 
-          {/* REAL TIME STATUS BADGE */}
+          {/* DYNAMIC STATUS BADGE */}
           <span
             className={`px-3 py-1 rounded-full text-xs font-bold font-mono border transition-all ${
               isFall
@@ -224,11 +224,11 @@ export default function Home() {
                 : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
             }`}
           >
-            {isFall ? "🚨 PATIENT BED FALL DETECTED" : "✓ MONITORING ACTIVE"}
+            {isFall ? "🚨 PATIENT FALL DETECTED" : "✓ MONITORING ACTIVE"}
           </span>
         </div>
 
-        {/* 2-PANE DISPLAY: VIDEO ON LEFT, 3-STEP RESPONSE ON RIGHT */}
+        {/* 2-PANE DISPLAY */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 min-h-0 items-stretch">
           
           {/* LEFT: REAL OPENCV VIDEO STREAM */}
@@ -248,72 +248,85 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Impact Banner */}
+              {/* Dynamic Impact Banner ONLY when fall is detected */}
               {isFall && (
                 <div className="absolute bottom-4 inset-x-6 bg-rose-600/90 border border-rose-400 rounded-lg py-2 px-3 text-center text-xs font-mono font-bold text-white shadow-xl animate-pulse">
-                  CRITICAL IMPACT: Centroid Drop {kin.drop_pct}% | Vertical Loss {kin.height_loss_pct}%
+                  CRITICAL IMPACT DETECTED: Drop {kin.drop_pct}% | Vertical Loss {kin.height_loss_pct}%
                 </div>
               )}
             </div>
 
             <div className="h-9 w-full bg-[#07090e] rounded-lg border border-white/[0.06] px-3 flex items-center justify-between text-[11px] font-mono">
-              <span className="text-cyan-400">STATUS:</span>
-              <span className="text-zinc-300 truncate max-w-lg">{cl.open_loop_comparison}</span>
-              <span className="text-zinc-500 text-[10px]">Real Footage: GMDCSA24 (CC BY 4.0)</span>
+              <span className="text-cyan-400">TELEMETRY:</span>
+              <span className="text-zinc-300 truncate max-w-lg">
+                {isFall
+                  ? "Impact detected! Downward velocity threshold crossed. Alert dispatched."
+                  : "Patient posture within normal limits. Standing by for impact event..."}
+              </span>
+              <span className="text-zinc-500 text-[10px]">GMDCSA24 Real Footage</span>
             </div>
           </div>
 
-          {/* RIGHT: CLEAN 3-STEP CARE CASCADE */}
+          {/* RIGHT: DYNAMIC 3-STEP CARE CASCADE */}
           <div className="lg:col-span-4 flex flex-col justify-between gap-2.5 h-full min-h-0">
             
-            {/* STEP 1: Bedside Action */}
+            {/* STEP 1: Bedside Action (Dynamic) */}
             <div className={`p-3.5 rounded-xl border transition-all flex-1 flex flex-col justify-center ${
               isFall ? "bg-rose-500/10 border-rose-500/40 shadow-[0_0_15px_rgba(244,63,94,0.2)]" : "bg-white/[0.02] border-white/[0.06]"
             }`}>
               <div className="flex items-center justify-between text-[10px] font-mono mb-1">
                 <span className="text-zinc-400 font-bold">1. IN-ROOM (BEDSIDE)</span>
                 <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                  isFall ? "bg-rose-500/20 text-rose-300" : "bg-emerald-500/10 text-emerald-400"
+                  isFall ? "bg-rose-500/20 text-rose-300" : "bg-zinc-800 text-zinc-400"
                 }`}>
-                  {isFall ? "ALERT SOUNDING" : "STANDBY"}
+                  {isFall ? "TRIGGERED" : "STANDBY"}
                 </span>
               </div>
               <div className="flex items-start gap-2.5">
-                <div className={`p-2 rounded-lg ${isFall ? "bg-rose-500/20 text-rose-300" : "bg-cyan-500/10 text-cyan-400"}`}>
+                <div className={`p-2 rounded-lg ${isFall ? "bg-rose-500/20 text-rose-300" : "bg-white/[0.04] text-zinc-500"}`}>
                   <Volume2 className="h-4 w-4" />
                 </div>
                 <div>
-                  <h4 className="text-xs font-semibold text-white">Orientation Tone & Voice</h4>
+                  <h4 className="text-xs font-semibold text-white">
+                    {isFall ? "Orientation Tone & Voice Activated" : "Acoustic Beacon"}
+                  </h4>
                   <p className="text-[11px] text-zinc-400 mt-0.5">
                     {isFall
-                      ? "880Hz tone sounds and voice speaks to reassure the patient help is arriving."
-                      : "Awaiting patient movement trigger."}
+                      ? "880Hz chime sounding and reassuring voice active in room."
+                      : "Standing by. Deploys orientation audio on impact."}
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* STEP 2: Mobile Nurse Dispatch */}
+            {/* STEP 2: Mobile Nurse Dispatch (Dynamic) */}
             <div className={`p-3.5 rounded-xl border transition-all flex-1 flex flex-col justify-center ${
               isFall ? "bg-rose-500/10 border-rose-500/40 shadow-[0_0_15px_rgba(244,63,94,0.2)]" : "bg-white/[0.02] border-white/[0.06]"
             }`}>
               <div className="flex items-center justify-between text-[10px] font-mono mb-1">
-                <span className="text-zinc-400 font-bold">2. NURSE STATION (STAT DISPATCH)</span>
-                <span className="text-[9px] text-zinc-500 font-mono">ROOM: BED 04</span>
+                <span className="text-zinc-400 font-bold">2. NURSE STATION CONSOLE</span>
+                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                  isFall ? "bg-rose-500/20 text-rose-300 animate-pulse" : "bg-zinc-800 text-zinc-400"
+                }`}>
+                  {isFall ? "STAT DISPATCH" : "IDLE"}
+                </span>
               </div>
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-start gap-2.5">
-                  <div className={`p-2 rounded-lg ${isFall ? "bg-rose-500/20 text-rose-300" : "bg-amber-500/10 text-amber-400"}`}>
+                  <div className={`p-2 rounded-lg ${isFall ? "bg-rose-500/20 text-rose-300" : "bg-white/[0.04] text-zinc-500"}`}>
                     <BellRing className="h-4 w-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-semibold text-white">Alert Sent to Nurse Sarah</h4>
+                    <h4 className="text-xs font-semibold text-white">
+                      {isFall ? "Urgent Fall Page Sent to Nurse Sarah" : "No Active Alerts"}
+                    </h4>
                     <p className="text-[11px] text-zinc-400 mt-0.5">
-                      {isFall ? "STAT fall notification with impact telemetry." : "Nurse Sarah Jenkins assigned."}
+                      {isFall ? "Bed 04 impact telemetry pushed to mobile pager." : "Standing by for verified events."}
                     </p>
                   </div>
                 </div>
 
+                {/* Nurse Attended Button ONLY on fall */}
                 {isFall && (
                   <button
                     onClick={handleResolve}
@@ -330,10 +343,10 @@ export default function Home() {
             <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] flex-1 flex flex-col justify-between">
               <div className="flex items-center justify-between text-[10px] font-mono">
                 <span className="text-zinc-400 font-bold">3. SHIFT AUDIT RECORD</span>
-                <span className="text-[9px] text-zinc-500 font-mono">SHA-256 SEALED</span>
+                <span className="text-[9px] text-emerald-400 font-mono">SHA-256 SEALED</span>
               </div>
               <p className="text-[11px] text-zinc-400 my-1">
-                Incident timestamps saved to hospital EMR. Zero video is saved to protect privacy.
+                Zero video is saved to protect privacy. Verifiable event timestamps compiled upon handoff.
               </p>
               <button
                 onClick={handleDischarge}

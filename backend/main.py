@@ -11,7 +11,7 @@ import os
 from real_vision_engine import RealFootageVisionEngine
 from agent_core import ArchivalHospitalAgent
 
-app = FastAPI(title="DualPulse AI Real Bed Fall Sentinel", version="4.1.0")
+app = FastAPI(title="DualPulse AI Real Bed Fall Sentinel", version="4.2.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -39,16 +39,16 @@ class PatientProfile(BaseModel):
 active_patient = PatientProfile()
 
 class ClipCommand(BaseModel):
-    clip_id: str  # "BED_FALL_NIGHT", "BED_FALL_CHAIR", "WEBCAM"
+    clip_id: str  # "FALL_CHAIR", "FALL_SUDDEN", "WEBCAM"
 
 CURRENT_STATE = {
-    "clip_id": "BED_FALL_NIGHT",
+    "clip_id": "FALL_CHAIR",
     "video_source": "REAL_DATASET"
 }
 
 CLIP_MAP = {
-    "BED_FALL_NIGHT": "sample_bed_fall_night.mp4",
-    "BED_FALL_CHAIR": "sample_fall.mp4"
+    "FALL_CHAIR": "sample_fall.mp4",
+    "FALL_SUDDEN": "sample_fall_2.mp4"
 }
 
 current_cap = None
@@ -56,7 +56,7 @@ webcam_cap = None
 
 def get_clip_cap(clip_id: str):
     backend_dir = os.path.dirname(__file__)
-    filename = CLIP_MAP.get(clip_id, "sample_bed_fall_night.mp4")
+    filename = CLIP_MAP.get(clip_id, "sample_fall.mp4")
     path = os.path.join(backend_dir, filename)
     if os.path.exists(path):
         return cv2.VideoCapture(path)
