@@ -10,8 +10,7 @@ import {
   CheckCircle,
   Loader2,
   Camera,
-  Film,
-  Sparkles,
+  Moon,
 } from "lucide-react";
 
 export default function Home() {
@@ -31,7 +30,7 @@ export default function Home() {
     agent: { dispatches: [] },
   });
 
-  const [activeClip, setActiveClip] = useState<string>("FALL_CHAIR");
+  const [activeClip, setActiveClip] = useState<string>("BED_FALL_NIGHT");
   const [liveStreamFrame, setLiveStreamFrame] = useState<string | null>(null);
   const [backendConnected, setBackendConnected] = useState<boolean>(false);
   const [coolDrawerOpen, setCoolDrawerOpen] = useState<boolean>(false);
@@ -160,7 +159,7 @@ export default function Home() {
         <div className="flex items-center gap-2">
           <span className="h-2 w-2 rounded-full bg-[#00E5FF] shadow-[0_0_8px_#00E5FF] animate-pulse" />
           <span className="text-sm font-bold tracking-[0.14em] uppercase text-white">DUALPULSE AI</span>
-          <span className="text-xs text-zinc-500 font-mono ml-1">// PATIENT FALL SENTINEL</span>
+          <span className="text-xs text-zinc-500 font-mono ml-1">// PATIENT BED FALL SENTINEL</span>
         </div>
 
         <button
@@ -175,33 +174,33 @@ export default function Home() {
       {/* 2. CHASSIS STAGE */}
       <div className="w-full max-w-6xl mx-auto flex-1 max-h-[82vh] rounded-2xl bg-[#0b0d14]/90 border border-white/[0.08] p-4 shadow-[0_0_50px_rgba(0,0,0,0.8)] backdrop-blur-xl flex flex-col justify-between gap-3 box-border">
         
-        {/* SELECTOR BAR: FOCUS ON THE 2 REAL FALL SCENARIOS */}
+        {/* SELECTOR BAR: THE 2 REAL BED FALL SCENARIOS */}
         <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-mono uppercase text-zinc-400 tracking-wider">Test Scenario:</span>
+            <span className="text-xs font-mono uppercase text-zinc-400 tracking-wider">Test Fall:</span>
             
             <button
-              onClick={() => handleSelectClip("FALL_CHAIR")}
+              onClick={() => handleSelectClip("BED_FALL_NIGHT")}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 border ${
-                activeClip === "FALL_CHAIR"
+                activeClip === "BED_FALL_NIGHT"
                   ? "bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.25)]"
                   : "bg-white/[0.02] text-zinc-300 border-white/[0.06] hover:text-white"
               }`}
             >
-              <ShieldAlert className="h-3.5 w-3.5 text-rose-400" />
-              <span>1. Chair Transfer Fall</span>
+              <Moon className="h-3.5 w-3.5 text-cyan-400" />
+              <span>1. Overnight Bed-to-Floor Fall</span>
             </button>
 
             <button
-              onClick={() => handleSelectClip("FALL_BED")}
+              onClick={() => handleSelectClip("BED_FALL_CHAIR")}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 border ${
-                activeClip === "FALL_BED"
+                activeClip === "BED_FALL_CHAIR"
                   ? "bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.25)]"
                   : "bg-white/[0.02] text-zinc-300 border-white/[0.06] hover:text-white"
               }`}
             >
               <ShieldAlert className="h-3.5 w-3.5 text-rose-400" />
-              <span>2. Sudden Bed Fall</span>
+              <span>2. Bedside Chair Collapse</span>
             </button>
 
             <button
@@ -213,7 +212,7 @@ export default function Home() {
               }`}
             >
               <Camera className="h-3.5 w-3.5 text-cyan-400" />
-              <span>Live Camera</span>
+              <span>Live USB Camera</span>
             </button>
           </div>
 
@@ -225,7 +224,7 @@ export default function Home() {
                 : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
             }`}
           >
-            {isFall ? "🚨 PATIENT FALL DETECTED" : "✓ MONITORING ACTIVE"}
+            {isFall ? "🚨 PATIENT BED FALL DETECTED" : "✓ MONITORING ACTIVE"}
           </span>
         </div>
 

@@ -7,12 +7,11 @@ import cv2
 import json
 import time
 import os
-import glob
 
 from real_vision_engine import RealFootageVisionEngine
 from agent_core import ArchivalHospitalAgent
 
-app = FastAPI(title="DualPulse AI Real-Footage Clinical Sentinel", version="4.0.0")
+app = FastAPI(title="DualPulse AI Real Bed Fall Sentinel", version="4.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -29,7 +28,7 @@ class PatientProfile(BaseModel):
     patient_id: str = "PT-8821"
     name: str = "Robert Davis"
     age: int = 68
-    diagnosis: str = "Post-Stroke Recovery / Fall-Risk Protocol"
+    diagnosis: str = "Post-Stroke Recovery / Bed Fall Risk"
     acuity_mode: str = "HIGH_ACUITY_ICU"
     diet: str = "NPO (Strict Fasting - Post-Op)"
     allergies: str = "Penicillin, Latex"
@@ -40,18 +39,16 @@ class PatientProfile(BaseModel):
 active_patient = PatientProfile()
 
 class ClipCommand(BaseModel):
-    clip_id: str  # "FALL_CHAIR", "FALL_BED", "ADL_SLEEP", "ADL_TURN", "WEBCAM"
+    clip_id: str  # "BED_FALL_NIGHT", "BED_FALL_CHAIR", "WEBCAM"
 
 CURRENT_STATE = {
-    "clip_id": "FALL_CHAIR",
-    "video_source": "REAL_DATASET" # or "WEBCAM"
+    "clip_id": "BED_FALL_NIGHT",
+    "video_source": "REAL_DATASET"
 }
 
 CLIP_MAP = {
-    "FALL_CHAIR": "sample_fall.mp4",
-    "FALL_BED": "sample_fall_2.mp4",
-    "ADL_SLEEP": "sample_adl.mp4",
-    "ADL_TURN": "sample_adl_2.mp4"
+    "BED_FALL_NIGHT": "sample_bed_fall_night.mp4",
+    "BED_FALL_CHAIR": "sample_fall.mp4"
 }
 
 current_cap = None
@@ -59,19 +56,17 @@ webcam_cap = None
 
 def get_clip_cap(clip_id: str):
     backend_dir = os.path.dirname(__file__)
-    filename = CLIP_MAP.get(clip_id, "sample_fall.mp4")
+    filename = CLIP_MAP.get(clip_id, "sample_bed_fall_night.mp4")
     path = os.path.join(backend_dir, filename)
     if os.path.exists(path):
-        cap = cv2.VideoCapture(path)
-        return cap
+        return cv2.VideoCapture(path)
     return None
 
 @app.get("/")
 def read_root():
     return {
-        "system": "DualPulse AI Real-Footage Sentinel",
-        "dataset": "GMDCSA24 (CC BY 4.0 Verified Real Human Bedroom Footage)",
-        "current_clip": CURRENT_STATE["clip_id"],
+        "system": "DualPulse AI Hospital Bed Fall Sentinel",
+        "clip": CURRENT_STATE["clip_id"],
         "source": CURRENT_STATE["video_source"]
     }
 
@@ -148,7 +143,6 @@ async def websocket_telemetry(websocket: WebSocket):
             elif current_cap is not None and current_cap.isOpened():
                 ret, video_f = current_cap.read()
                 if not ret or video_f is None:
-                    # Loop video seamlessly
                     current_cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                     ret, video_f = current_cap.read()
                 if ret and video_f is not None:
@@ -159,15 +153,13 @@ async def websocket_telemetry(websocket: WebSocket):
                 cv2.putText(frame, "Awaiting Camera / Video Feed...", (120, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 200, 200), 2)
                 
             telemetry = engine.process_frame(frame)
-            
-            # Agent evaluation
             agent_decision = agent.evaluate(telemetry, active_patient.dict())
             telemetry["agent"] = agent_decision
             telemetry["patient"] = active_patient.dict()
             telemetry["clip_info"] = {
                 "active_clip": CURRENT_STATE["clip_id"],
                 "source": CURRENT_STATE["video_source"],
-                "dataset_citation": "GMDCSA24 Human Fall Dataset (CC BY 4.0)"
+                "dataset_citation": "GMDCSA24 (CC BY 4.0)"
             }
             
             await websocket.send_json(telemetry)
