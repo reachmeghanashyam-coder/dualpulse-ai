@@ -11,7 +11,7 @@ def run_cool_benchmark():
     comparing Standard x86 execution vs. Arm KleidiCV vector instructions.
     """
     print("=" * 70)
-    print("VITAZERO AI: CLOUD-OPTIMIZED OPENCV LIBRARY (COOL) GRAVITON BENCHMARK")
+    print("DUALPULSE AI: CLOUD-OPTIMIZED OPENCV LIBRARY (COOL) GRAVITON BENCHMARK")
     print("Measuring Sub-Pixel Phase Correlation & Ellipse Contouring Performance")
     print("=" * 70)
     
