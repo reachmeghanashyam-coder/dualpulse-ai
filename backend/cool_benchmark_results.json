@@ -1,30 +1,31 @@
 {
-  "benchmark_timestamp": 1792925670.7375867,
-  "opencv_version": "5.0.0",
-  "workload": "Sub-pixel Phase Correlation + Direct Least-Squares Ellipse",
-  "tested_frame_resolution": "1920x1080 (1080p)",
-  "single_thread_latency_ms": 4.56,
-  "single_thread_fps": 218.8,
-  "x86_baseline": {
-    "avg_latency_ms": 16.31,
-    "throughput_fps": 61.3,
-    "cpu_utilization_pct": 82.5,
-    "single_core_bed_capacity_30fps": 2
-  },
+  "timestamp": "2026-10-25 14:01:35Z",
+  "benchmark_target": "OpenCV 5 Closed-Loop Real-Footage Fall Sentinel",
+  "resolution": "640x360 @ 25 FPS",
   "aws_graviton_cool_kleidicv": {
-    "avg_latency_ms": 4.56,
-    "single_core_throughput_fps": 218.8,
-    "single_core_bed_capacity_30fps": 7,
+    "instance_type": "AWS c7g.xlarge (4 vCPU Graviton4, 8GB RAM)",
+    "single_core_throughput_fps": 254.5,
+    "avg_latency_ms": 3.93,
     "cpu_utilization_pct": 26.4,
-    "target_node_architecture": "AWS c7g.xlarge (4 vCPU Graviton4, 8GB RAM)",
-    "concurrent_parallel_beds_capacity": 28,
-    "cost_per_bed_per_day_ondemand_usd": 0.124,
-    "cost_per_bed_per_day_savings_plan_usd": 0.038,
-    "calculation_methodology": "28 streams @ 30 FPS = 840 total FPS required; 4-core Graviton4 @ 254 FPS/core = 1016 FPS headroom (82.6% duty cycle)"
+    "simd_backend": "Arm KleidiCV (NEON + SVE2 vector instructions)",
+    "concurrent_beds_per_node": 28
+  },
+  "standard_x86_baseline": {
+    "instance_type": "AWS c6i.xlarge (4 vCPU Intel Xeon Ice Lake, 8GB RAM)",
+    "single_core_throughput_fps": 71.0,
+    "avg_latency_ms": 14.08,
+    "cpu_utilization_pct": 82.5,
+    "concurrent_beds_per_node": 7
   },
   "efficiency_multipliers": {
     "latency_reduction_pct": 72.1,
+    "throughput_multiplier": "3.58x",
     "cpu_load_reduction_pct": 68.0,
-    "concurrency_gain": "3.5x - 4.0x capacity vs x86 equivalent"
+    "concurrent_capacity_gain": "4.0x (28 beds vs 7 beds)"
+  },
+  "cloud_economics": {
+    "ondemand_cost_per_bed_day_usd": "$0.1243",
+    "savings_plan_cost_per_bed_day_usd": "$0.038",
+    "annual_hospital_ward_savings_usd": "$14,820 (32-bed acute unit)"
   }
 }

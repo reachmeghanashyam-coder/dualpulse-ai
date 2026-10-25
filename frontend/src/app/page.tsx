@@ -30,7 +30,7 @@ export default function Home() {
     agent: { dispatches: [] },
   });
 
-  const [activeClip, setActiveClip] = useState<string>("FALL_CHAIR");
+  const [activeClip, setActiveClip] = useState<string>("FALL_STANDING");
   const [liveStreamFrame, setLiveStreamFrame] = useState<string | null>(null);
   const [backendConnected, setBackendConnected] = useState<boolean>(false);
   const [coolDrawerOpen, setCoolDrawerOpen] = useState<boolean>(false);
@@ -79,6 +79,13 @@ export default function Home() {
   };
 
   useEffect(() => {
+    // Reset backend clip state on fresh page load/refresh
+    fetch("http://localhost:8000/api/eval/clip", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clip_id: "FALL_STANDING" }),
+    }).catch(() => {});
+
     let ws: WebSocket | null = null;
     try {
       ws = new WebSocket("ws://localhost:8000/ws/telemetry");
@@ -180,6 +187,18 @@ export default function Home() {
             <span className="text-xs font-mono uppercase text-zinc-400 tracking-wider">Test Fall:</span>
             
             <button
+              onClick={() => handleSelectClip("FALL_STANDING")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 border ${
+                activeClip === "FALL_STANDING"
+                  ? "bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.25)]"
+                  : "bg-white/[0.02] text-zinc-300 border-white/[0.06] hover:text-white"
+              }`}
+            >
+              <ShieldAlert className="h-3.5 w-3.5 text-rose-400" />
+              <span>1. Standing Transfer Fall</span>
+            </button>
+
+            <button
               onClick={() => handleSelectClip("FALL_CHAIR")}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 border ${
                 activeClip === "FALL_CHAIR"
@@ -188,19 +207,7 @@ export default function Home() {
               }`}
             >
               <ShieldAlert className="h-3.5 w-3.5 text-rose-400" />
-              <span>1. Bedside Chair Collapse (4.3s)</span>
-            </button>
-
-            <button
-              onClick={() => handleSelectClip("FALL_SUDDEN")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 border ${
-                activeClip === "FALL_SUDDEN"
-                  ? "bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.25)]"
-                  : "bg-white/[0.02] text-zinc-300 border-white/[0.06] hover:text-white"
-              }`}
-            >
-              <ShieldAlert className="h-3.5 w-3.5 text-rose-400" />
-              <span>2. Sudden Floor Collapse (2.6s)</span>
+              <span>2. Bedside Chair Fall</span>
             </button>
 
             <button

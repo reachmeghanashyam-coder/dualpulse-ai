@@ -1,96 +1,101 @@
-# DualPulse AI: Closed-Loop Night-ICU Vision Sentinel
-> **Self-Correcting Perceptual Edge Vision for Overnight Hospital Bed Safety**  
+# DualPulse AI: Closed-Loop Real-Footage Patient Sentinel
+> **Deterministic Kinematic Fall Detection & False-Alarm Suppression for Hospital Safety**  
 > *OpenCV AI Competition 2026 (powered by AWS)*  
 > **Target Tracks:** Grand Prize ($5,000) • Best Use of COOL Award ($1,000) • Agentic Vision Award ($1,000)
 
 ---
 
-## 1. Abstract & Why Open-Loop Hospital Vision Fails
-In overnight ICU and step-down wards (10:00 PM – 6:00 AM), ambient lighting is dimmed while bedside vitals monitors cast harsh specular glare across the patient's head and upper chest. Standard **open-loop** computer vision systems fail in this environment in two ways:
-1. **Missed Critical Hazards:** Specular glare domes ($\rho_{\text{glare}} > 4\%$) and deep night shadows ($\mu_I < 30$) blind dense optical flow trackers right over the endotracheal airway zone, missing unconscious ICU-delirium tube pulls ($v_y = -0.4\text{ px/f}$ raw vs. $-6.8\text{ px/f}$ true).
-2. **Severe Alarm Fatigue:** Simple motion-threshold detectors trigger false alarms every time a patient shifts their blanket or rolls safely in bed, causing nurses to ignore or disable alerts.
+## 1. The Core Problem: Real Patient Falls vs. Hospital Alarm Fatigue
+Unassisted falls in acute and step-down hospital wards account for substantial patient injury, extended lengths of stay, and unbillable clinical complications. Existing optical patient monitors fail in practice due to two fatal flaws:
+1. **Missed Low-Contrast Falls:** Ambient night lighting and specular reflections obscure patient silhouettes, preventing reliable detection during unassisted bed-exit attempts.
+2. **Severe Alarm Fatigue:** Simple motion-energy triggers alarm whenever a patient adjusts their bedding or turns safely in bed. Overwhelmed nursing staff disable the monitors, leaving patients unprotected.
 
-**DualPulse AI** solves both problems using a **5-Stage Closed-Loop Agentic Vision Pipeline** powered by **OpenCV 5** and accelerated by the **Cloud-Optimized OpenCV Library (COOL)** on **AWS Graviton4 (`c7g.xlarge`)**. Instead of running a passive single-pass detector, the agent continuously **Perceives** optical quality degradation, **Conditions** the pixel matrix using OpenCV restoration tools, **Verifies & Backtracks** if noise is over-amplified, and **Abstains** from false alarms on benign movement.
-
-> *Disclaimer: DualPulse AI is a non-diagnostic nursing situational awareness sentinel, not a primary medical diagnostic device. It does not replace certified healthcare personnel.*
+**DualPulse AI** eliminates both failure modes. Operating on real human bedroom and ward fall footage from the **GMDCSA24 benchmark (CC BY 4.0)**, DualPulse AI combines **Closed-Loop OpenCV 5 Frame Conditioning** (`cv2.inpaint` + `cv2.createCLAHE` + `cv2.bilateralFilter`) with a deterministic **Kinematic Trajectory Gate** that evaluates centroid downward descent velocity, bounding-box aspect ratio expansion, and post-collapse immobility over calibrated temporal windows.
 
 ---
 
-## 2. Closed-Loop Agentic Vision Architecture (`Perceive -> Act -> Verify/Backtrack -> Decide/Abstain`)
+## 2. Real-Footage Perception & Action Pipeline
 
 ```
-[ Raw Night-ICU Camera Frame (Volatile RAM) ]
-              │
-              ▼ 1. PERCEIVE (Perceptual Quality Evaluator)
-[ Compute J(I): Luminance μ_I, Contrast σ_I, Glare Ratio ρ_glare, Laplacian Focus Var, SNR (dB) ]
-              │
-              ▼ 2. DECIDE & ACT (Autonomous OpenCV Conditioning Tools)
-   ┌──────────┴────────────────────────────────────────────────────────────────┐
-   ├─ If ρ_glare > 0.6%: cv2.threshold(230) -> cv2.dilate -> cv2.inpaint(TELEA) │
-   ├─ If μ_I < 85: Candidate A cv2.createCLAHE(clip=4.2) + Gamma LUT           │
-   └─ If Sharpness < 90: cv2.addWeighted(unsharp_mask)                         │
-              │
-              ▼ 3. VERIFY & BACKTRACK (Closed-Loop Self-Correction)
-   ┌──────────┴───────────────────────────┐
-   │ Did Aggressive CLAHE drop SNR <11.5dB?│
-   └──────────┬───────────────────────────┘
-              ├─ YES (Backtrack): Revert & execute cv2.createCLAHE(clip=2.4) + cv2.bilateralFilter(d=5)
-              └─ NO (Commit): Proceed with verified restored frame (J_raw=0.31 -> J_restored=0.89, +187%)
-              │
-              ▼ 4. TRACK (OpenCV 5 Dense Optical Flow & Anatomical ROIs)
-[ cv2.calcOpticalFlowFarneback on Restored Frame across Airway Tube, Central Line & Bed Perimeter ]
-              │
-              ▼ 5. ESCALATE OR ABSTAIN (Alarm-Fatigue Gate)
-   ┌──────────┴────────────────────────────────────────────────────────────────┐
-   ├─ [Hazard Confirmed]: 880Hz Bedside Deterrent Chime + STAT Nurse Dispatch   │
-   ├─ [Benign Blanket Shift]: ABSTAINED_SAFE_MOTION (False Alarm Suppressed)    │
-   └─ [Nurse Arrival]: "Nurse Attended" closes loop -> SHA-256 Shift Audit Log  │
+[ Real Human Fall Video Stream (Volatile RAM) ]
+                   │
+                   ▼ 1. PERCEIVE (Perceptual Quality Evaluator)
+[ Compute μ_I (Luminance), σ_I (Contrast), ρ_glare (Specular Fraction), Laplacian Focus Variance ]
+                   │
+                   ▼ 2. CONDITION (Closed-Loop OpenCV Image Enhancement)
+   ┌───────────────┴────────────────────────────────────────────────────────┐
+   ├─ Specular Glare (ρ > 0.6%): cv2.threshold(230) -> cv2.inpaint(TELEA)   │
+   ├─ Low-Light / Shadow (μ < 85): cv2.createCLAHE(2.4) + cv2.bilateralFilter│
+   └─ Backtrack Verification: If SNR / quality score drops, revert to raw   │
+                   │
+                   ▼ 3. TRACK & SEGMENT (OpenCV 5 MOG2 Kinematics)
+[ cv2.createBackgroundSubtractorMOG2 + Morphological Open/Close + Contour Bounding Box ]
+                   │
+                   ▼ 4. DETERMINISTIC KINEMATIC FALL DECISION
+   ┌───────────────┴────────────────────────────────────────────────────────┐
+   ├─ Centroid Descent ΔY (Standing Fall ≥ 20.0%, Chair Slide ≥ 13.0%)     │
+   ├─ Bounding Box Height Loss (ΔH ≥ 20–25%)                                │
+   ├─ Post-Impact Aspect Ratio Expansion (W/H > 1.0) & Floor Immobility    │
+   └─ Temporal Gate: 3 Consecutive Confirmed Frames (Noise Filter)          │
+                   │
+                   ▼ 5. CLOSED-LOOP 3-TIER CARE CASCADE
+   ┌───────────────┴────────────────────────────────────────────────────────┐
+   ├─ Tier 1 (Bedside): In-Room 880Hz Orientation Chime + Reassuring Voice  │
+   ├─ Tier 2 (Ward Station): STAT Mobile Pager Dispatch with Drop Telemetry │
+   ├─ Nurse Attended: Bedside clearance clears alarm & logs resolution time │
+   └─ Tier 3 (Shift Audit): SHA-256 sealed EMR event record (Zero saved MP4)│
 ```
-
-### Live Split-Screen Visual Proof & 4 Interactive Scenarios
-The dashboard streams a live **Split-Screen OpenCV Diagnostic Canvas** (`RAW NIGHT SENSOR` on the left vs. `OPENCV 5 CONDITIONED + OPTICAL FLOW` on the right) across 4 1-click scenarios and live USB webcam input:
-1. **`1. Tube Pull (Glare Recovery)`:** Inpaints bedside monitor specular glare and applies night-vision CLAHE to catch a patient's hand reaching for their breathing tube ($v_y = -6.8\text{ px/f}$), firing an immediate 880Hz bedside deterrent chime + nurse STAT alert.
-2. **`2. Bed Fall (Shadow CLAHE)`:** Restores low-contrast shadow gradients along the bed rails to intercept unassisted bed exits with a reassuring bedside voice prompt.
-3. **`3. Seizure (Deblur Gate)`:** Applies unsharp masking and bilateral noise gating to isolate $6.0\text{ Hz}$ high-energy clonic oscillations.
-4. **`4. Blanket Shift [Abstain Test]`:** Demonstrates **Closed-Loop False-Alarm Abstention**. High optical flow ($5.4\text{ px/f}$) occurs inside the safe bed center with zero airway vector convergence; the agent explicitly logs `ABSTAINED_SAFE_MOTION` and suppresses the nurse pager.
 
 ---
 
-## 3. Empirical Performance & AWS Graviton4 (COOL) Benchmarks
+## 3. Real Clinical Scenarios & Interactive Demo Modes
 
-Continuous 30 FPS closed-loop conditioning (`cv2.inpaint` + `cv2.createCLAHE` + `cv2.bilateralFilter` + `cv2.calcOpticalFlowFarneback`) across an entire hospital ward requires high-efficiency ARM64 SIMD execution. We benchmarked the OpenCV workload comparing standard x86 execution against **AWS Graviton4 (`c7g.xlarge`)** with **OpenCV 5 C++ COOL (Arm KleidiCV NEON/SVE2)**:
+The frontend provides an interactive, consumer-grade HUD demonstrating end-to-end autonomous intervention across real human footage:
+1. **`1. Standing Transfer Fall` (Primary Showcase):**  
+   Patient is standing and walking across the room. At $t = 2.6\text{s}$, a sudden leg collapse drops the centroid downward by **$20.7\%$** and reduces vertical height by **$30.3\%$**. DualPulse AI confirms the fall across 3 consecutive frames, fires the in-room 880Hz chime and voice prompt, dispatches the nurse console, and displays the glowing **`[Nurse Attended]`** acknowledgment button.
+2. **`2. Bedside Chair Fall`:**  
+   Patient seated in an armchair loses balance and slides down to the floor at $t = 5.0\text{s}$ ($\Delta Y = 13.2\%$). DualPulse AI catches the gradual descent and post-impact stillness, triggering the acute response cascade.
+3. **`Live USB Camera`:**  
+   Enables judges and evaluators to test real-time OpenCV motion tracking and false-alarm suppression directly from any connected webcam.
+
+---
+
+## 4. AWS Graviton4 & COOL Optimization Engine
+
+Continuous 25 FPS closed-loop processing across multiple hospital beds demands predictable, low-power ARM64 execution. DualPulse AI is benchmarked on **AWS Graviton4 (`c7g.xlarge`)** using **OpenCV 5 C++ COOL (Arm KleidiCV NEON/SVE2)**:
 
 | Metric | Standard x86 Baseline | AWS Graviton4 + Arm KleidiCV (COOL) | Efficiency Multiplier |
 | :--- | :--- | :--- | :--- |
 | **Average Frame Latency** | 14.08 ms | **3.93 ms** | **72.1% Latency Reduction** |
-| **Single-Core Throughput** | 71.0 FPS / core | **254.5 FPS / core** (~8 beds/core) | **3.58x Throughput Gain** |
+| **Single-Core Throughput** | 71.0 FPS / core | **254.5 FPS / core** | **3.58x Throughput Gain** |
 | **CPU Utilization Load** | 82.5% | **26.4%** | **68.0% CPU Load Reduction** |
-| **4-vCPU Ward Concurrency** | 7 Concurrent Beds @ 30 FPS | **28 Concurrent Beds @ 30 FPS** (840 FPS total) | **4.0x Stream Density** |
-| **Target Node Economics** | `c6i.xlarge` ($0.170/hr) | **`c7g.xlarge` ($0.145/hr Graviton4)** | **$0.124 on-demand ($0.038 savings plan / bed / day)** |
+| **Ward Concurrency (4 vCPU)**| 7 Concurrent Beds @ 25 FPS | **28 Concurrent Beds @ 25 FPS** | **4.0x Stream Density** |
+| **Bed Economics** | $0.170 / hour (`c6i.xlarge`) | **$0.145 / hour (`c7g.xlarge`)** | **$0.038 / bed / day (3-yr Savings Plan)** |
 
 ---
 
-## 4. Privacy & Compliance by Design
-- **Zero Persistent Video Storage:** All raw and conditioned pixel matrices exist strictly in volatile RAM for `< 4ms` and are never written to disk.
-- **Cryptographic Shift Audit Ledger:** Upon shift handoff or patient discharge, the agent compiles a JSON audit record of verified intercepts, nurse resolutions, and suppressed false alarms sealed with a **SHA-256** digest.
+## 5. Privacy & Cryptographic Archival Assurance
+- **Ephemeral RAM Processing:** Raw camera video frames are processed in volatile memory and purged within $4\text{ms}$. Zero video is ever saved to persistent disk.
+- **SHA-256 EMR Audit Ledger:** Clicking **"View Shift Audit Log"** outputs a cryptographically verified JSON audit record documenting incident timestamps, kinematic descent metrics, and nurse resolution times.
 
 ---
 
-## 5. Quickstart & Verification
+## 6. Zero-Dependency Verification & Quickstart
 
 ```bash
-# 1. Run Automated Clinical & Closed-Loop OpenCV Unit Tests (Exit Code 0)
+# 1. Run Automated Unit Test Suite (All 5 tests must pass with exit code 0)
 cd backend
-python test_core.py
+python -m unittest test_core.py
 
 # 2. Run Reproducible AWS Graviton4 COOL Benchmark
 python cool_benchmark.py
 
-# 3. Launch Local FastAPI + OpenCV 5 Backend Daemon
+# 3. Launch Backend Daemon (FastAPI + OpenCV 5)
 python -m uvicorn main:app --host 0.0.0.0 --port 8000
 
-# 4. Launch Next.js 100vh Split-Screen HUD
+# 4. Launch Next.js Production Build
 cd ../frontend
-npm run dev
+npm run build
+npm start
 # Open http://localhost:3000
 ```

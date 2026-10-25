@@ -42,13 +42,18 @@ class ClipCommand(BaseModel):
     clip_id: str  # "FALL_CHAIR", "FALL_SUDDEN", "WEBCAM"
 
 CURRENT_STATE = {
-    "clip_id": "FALL_CHAIR",
+    "clip_id": "FALL_STANDING",
     "video_source": "REAL_DATASET"
 }
 
 CLIP_MAP = {
-    "FALL_CHAIR": "sample_fall.mp4",
-    "FALL_SUDDEN": "sample_fall_2.mp4"
+    "FALL_STANDING": "sample_walking_fall.mp4",
+    "FALL_CHAIR": "sample_fall.mp4"
+}
+
+CLIP_WARMUP = {
+    "FALL_CHAIR": 0,
+    "FALL_STANDING": 0
 }
 
 current_cap = None
@@ -59,7 +64,13 @@ def get_clip_cap(clip_id: str):
     filename = CLIP_MAP.get(clip_id, "sample_fall.mp4")
     path = os.path.join(backend_dir, filename)
     if os.path.exists(path):
-        return cv2.VideoCapture(path)
+        cap = cv2.VideoCapture(path)
+        warmup = CLIP_WARMUP.get(clip_id, 0)
+        for _ in range(warmup):
+            ret, f = cap.read()
+            if ret and f is not None:
+                engine.process_frame(f)
+        return cap
     return None
 
 @app.get("/")
@@ -97,6 +108,7 @@ def set_clip(cmd: ClipCommand):
 
 @app.post("/api/patient/resolve")
 def resolve_incident():
+    global current_cap
     now = time.time()
     agent.escalation_log.append({
         "event_id": f"RESOLVE-{int(now * 1000)}",
@@ -105,7 +117,10 @@ def resolve_incident():
         "action_taken": "Bedside Attended & Bed Tripped Alarms Cleared by Nurse Sarah Jenkins, RN",
         "patient_id": active_patient.patient_id
     })
-    engine.active_verdict = "PATIENT_REST_NORMAL"
+    engine.reset()
+    if current_cap is not None:
+        current_cap.release()
+    current_cap = get_clip_cap(CURRENT_STATE["clip_id"])
     return {"status": "RESOLVED", "current_breach": "NONE"}
 
 @app.post("/api/patient/discharge")

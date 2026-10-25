@@ -1,111 +1,112 @@
+import unittest
 import numpy as np
-import sys
+import cv2
 import os
+import sys
 
 sys.path.append(os.path.dirname(__file__))
-from vision_engine import ThreeTierClinicalVisionEngine
+from real_vision_engine import RealFootageVisionEngine, condition_frame, evaluate_quality
 from agent_core import ArchivalHospitalAgent
-from main import synthesize_night_icu_frame
 
-def test_acuity_mode_drives_cv_rules():
-    engine = ThreeTierClinicalVisionEngine()
-    frame = synthesize_night_icu_frame(640, 480, 1, "NONE")
-    
-    # 1. Test High-Acuity ICU Mode: Tight bed perimeter
-    engine.set_acuity_mode("HIGH_ACUITY_ICU")
-    telemetry_icu = engine.process_frame(frame)
-    assert telemetry_icu["acuity_mode"] == "HIGH_ACUITY_ICU"
-    assert telemetry_icu["active_perimeter"] == engine.bed_perimeter_icu
-    assert "line_sentinel" in telemetry_icu
-    
-    # 2. Test Step-Down Recovery Mode: Expanded spatial perimeter
-    engine.set_acuity_mode("STEP_DOWN_RECOVERY")
-    telemetry_recovery = engine.process_frame(frame)
-    assert telemetry_recovery["acuity_mode"] == "STEP_DOWN_RECOVERY"
-    assert telemetry_recovery["active_perimeter"] == engine.bed_perimeter_recovery
+class TestDualPulseSentinel(unittest.TestCase):
+    def setUp(self):
+        self.engine = RealFootageVisionEngine(fps=25.0)
+        self.agent = ArchivalHospitalAgent(room_id="WARD_BED_04")
+        self.backend_dir = os.path.dirname(__file__)
 
-def test_closed_loop_opencv_conditioning_and_extubation():
-    engine = ThreeTierClinicalVisionEngine()
-    agent = ArchivalHospitalAgent(room_id="ICU_BED_04")
-    
-    # Synthesize realistic dark ICU frame with specular monitor glare
-    frame1 = synthesize_night_icu_frame(640, 480, 1, "EXTUBATION_ATTEMPT")
-    frame2 = synthesize_night_icu_frame(640, 480, 2, "EXTUBATION_ATTEMPT")
-    
-    _ = engine.process_frame(frame1, simulated_event="EXTUBATION_ATTEMPT")
-    telemetry = engine.process_frame(frame2, simulated_event="EXTUBATION_ATTEMPT")
-    
-    # Verify Closed-Loop OpenCV Conditioning improved perceptual quality J(I)
-    cl = telemetry["closed_loop_vision"]
-    assert cl["restored_metrics"]["quality_score_j"] > cl["raw_metrics"]["quality_score_j"], \
-        f"Expected restored J ({cl['restored_metrics']['quality_score_j']}) > raw J ({cl['raw_metrics']['quality_score_j']})"
-    assert cl["restored_metrics"]["glare_ratio_pct"] < cl["raw_metrics"]["glare_ratio_pct"], \
-        "Expected specular monitor glare to be reduced by cv2.inpaint"
-    assert len(cl["tools_executed"]) >= 1
-    assert telemetry["video_frame_b64"] is not None and len(telemetry["video_frame_b64"]) > 1000
-    
-    # Verify Extubation Breach Detection
-    assert telemetry["breach_type"] == "UNPLANNED_EXTUBATION_RISK"
-    assert telemetry["line_sentinel"]["integrity_status"] == "CRITICAL_EXTUBATION_ATTEMPT"
-    assert telemetry["line_sentinel"]["extubation_risk_score"] >= 90.0
-    
-    patient = {
-        "name": "Robert Davis",
-        "patient_id": "PT-8821",
-        "diagnosis": "Post-Stroke Recovery / Neurological Care",
-        "acuity_mode": "HIGH_ACUITY_ICU"
-    }
-    decision = agent.evaluate(telemetry, patient)
-    
-    dispatches = decision["dispatches"]
-    assert any(d["tier"] == "TIER_1_BEDSIDE" for d in dispatches)
-    t1 = next(d for d in dispatches if d["tier"] == "TIER_1_BEDSIDE")
-    assert t1["action_type"] == "BEDSIDE_TONE_PULSE"
-    assert t1["frequency_hz"] == 880
-    assert any(d["tier"] == "TIER_2_WARD_CONSOLE" for d in dispatches)
-    
-    engine.reset_line_security()
-    assert engine.total_interventions_logged == 1
-    assert engine.line_integrity_status == "SECURE"
+    def test_image_quality_evaluator(self):
+        """Perception: Evaluates luminance, contrast, glare fraction, Laplacian focus variance."""
+        dark_frame = np.full((360, 640), 20, dtype=np.uint8)
+        q = evaluate_quality(dark_frame)
+        self.assertIn("mu", q)
+        self.assertIn("sigma", q)
+        self.assertIn("glare_pct", q)
+        self.assertIn("sharpness", q)
+        self.assertIn("J", q)
+        self.assertLess(q["mu"], 30.0)
 
-def test_false_alarm_abstention_on_blanket_shift():
-    engine = ThreeTierClinicalVisionEngine()
-    agent = ArchivalHospitalAgent(room_id="ICU_BED_04")
-    frame = synthesize_night_icu_frame(640, 480, 5, "BLANKET_SHIFT")
-    
-    telemetry = engine.process_frame(frame, simulated_event="BLANKET_SHIFT")
-    assert telemetry["breach_type"] == "ABSTAINED_SAFE_MOTION"
-    assert telemetry["status"] == "ABSTAINED_SAFE_MOTION"
-    assert telemetry["closed_loop_vision"]["abstained_false_alarm"] is True
-    assert telemetry["closed_loop_vision"]["total_false_alarms_abstained"] >= 1
-    
-    patient = {"name": "Robert Davis", "patient_id": "PT-8821"}
-    decision = agent.evaluate(telemetry, patient)
-    assert any(d["tier"] == "TIER_0_AGENT_ABSTENTION" for d in decision["dispatches"])
+    def test_closed_loop_conditioning(self):
+        """Conditioning: Tests glare inpainting and CLAHE contrast restoration."""
+        img = np.full((360, 640), 35, dtype=np.uint8)
+        # Inject synthetic specular monitor glare spot
+        cv2.circle(img, (320, 180), 40, 255, -1)
+        cond, trace = condition_frame(img)
+        self.assertIn("tools_executed", trace)
+        self.assertIn("quality_gain_pct", trace)
+        self.assertEqual(cond.shape, (360, 640))
+        # Glare tool was selected
+        self.assertTrue(any("inpaint" in t for t in trace["tools_executed"]))
 
-def test_archival_discharge_dossier():
-    engine = ThreeTierClinicalVisionEngine()
-    agent = ArchivalHospitalAgent(room_id="ICU_BED_04")
-    frame = synthesize_night_icu_frame(640, 480, 1, "NONE")
-    
-    patient = {
-        "name": "Robert Davis",
-        "patient_id": "PT-8821",
-        "age": 68,
-        "diagnosis": "Post-Stroke Recovery / Neurological Care",
-        "diet": "NPO (Strict Fasting - Post-Op)",
-        "medication_schedule": "Warfarin 5mg @ 22:00, Metoprolol 25mg @ 08:00"
-    }
-    telemetry = engine.process_frame(frame)
-    dossier = agent.compile_archival_discharge_dossier(patient, telemetry)
-    
-    assert "sha256:" in dossier["cryptographic_proof"]["hash"]
-    assert dossier["room_id"] == "ICU_BED_04"
-    assert "100% Zero Dislodgement" in dossier["patient_clinical_summary"]["line_extubation_prevention_status"]
+    def test_standing_fall_clip_verification(self):
+        """End-to-End: Verifies standing transfer fall on real GMDCSA24 footage."""
+        clip_path = os.path.join(self.backend_dir, "sample_walking_fall.mp4")
+        self.assertTrue(os.path.exists(clip_path), f"Clip missing: {clip_path}")
+        
+        cap = cv2.VideoCapture(clip_path)
+        self.assertTrue(cap.isOpened(), "Could not open standing fall clip")
+        
+        triggered = False
+        frame_idx = 0
+        trigger_frame = None
+        while cap.isOpened() and frame_idx < 120:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            res = self.engine.process_frame(frame)
+            if res["status"] == "CRITICAL_INTERVENTION_REQUIRED":
+                triggered = True
+                trigger_frame = frame_idx
+                break
+            frame_idx += 1
+        cap.release()
+        
+        self.assertTrue(triggered, "Standing transfer fall failed to trigger alarm")
+        # Ensure trigger occurs right during collapse (frame 63-75, ~2.5-3.0s)
+        self.assertGreaterEqual(trigger_frame, 60, f"Triggered too early at frame {trigger_frame}")
+        self.assertLessEqual(trigger_frame, 80, f"Triggered too late at frame {trigger_frame}")
+
+    def test_chair_fall_clip_verification(self):
+        """End-to-End: Verifies bedside chair collapse on real GMDCSA24 footage."""
+        clip_path = os.path.join(self.backend_dir, "sample_fall.mp4")
+        self.assertTrue(os.path.exists(clip_path), f"Clip missing: {clip_path}")
+        
+        cap = cv2.VideoCapture(clip_path)
+        self.assertTrue(cap.isOpened(), "Could not open chair fall clip")
+        
+        engine = RealFootageVisionEngine(fps=25.0)
+        triggered = False
+        frame_idx = 0
+        while cap.isOpened() and frame_idx < 160:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            res = engine.process_frame(frame)
+            if res["status"] == "CRITICAL_INTERVENTION_REQUIRED":
+                triggered = True
+                break
+            frame_idx += 1
+        cap.release()
+        
+        self.assertTrue(triggered, "Chair collapse failed to trigger alarm")
+
+    def test_nurse_resolution_and_audit_dossier(self):
+        """Action & Archival: Simulates nurse resolution and cryptographic EMR discharge digest."""
+        patient = {"patient_id": "PT-8821", "name": "Robert Davis"}
+        dummy_telemetry = {"breach_type": "BED_FALL_COLLAPSE", "closed_loop_vision": {"tools_executed": ["cv2.createCLAHE"]}}
+        
+        # Trigger agent evaluation
+        decision = self.agent.evaluate(dummy_telemetry, patient)
+        self.assertIn("dispatches", decision)
+        self.assertGreater(len(decision["dispatches"]), 0)
+        
+        # Compile discharge dossier
+        dossier = self.agent.compile_archival_discharge_dossier(patient, dummy_telemetry)
+        self.assertIn("cryptographic_proof", dossier)
+        proof = dossier["cryptographic_proof"]
+        self.assertEqual(proof["algorithm"], "SHA-256")
+        self.assertTrue(proof["hash"].startswith("sha256:"))
+        self.assertEqual(len(proof["hash"]), 71)  # 'sha256:' + 64 hex chars
+        self.assertEqual(dossier["patient_clinical_summary"]["id"], "PT-8821")
 
 if __name__ == "__main__":
-    test_acuity_mode_drives_cv_rules()
-    test_closed_loop_opencv_conditioning_and_extubation()
-    test_false_alarm_abstention_on_blanket_shift()
-    test_archival_discharge_dossier()
-    print("ALL DEEP CLINICAL & CLOSED-LOOP OPENCV TESTS PASSED (EXIT 0)")
+    unittest.main()
