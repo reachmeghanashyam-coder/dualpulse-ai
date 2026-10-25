@@ -163,7 +163,7 @@ class ArchivalHospitalAgent:
                 "line_extubation_prevention_status": f"100% Zero Dislodgement ({line_sentinel.get('total_interventions_logged', 0)} Intercepts Documented)"
             },
             "documented_incidents_count": len(self.escalation_log),
-            "incident_ledger": self.escalation_log,
+            "incident_ledger": list(self.escalation_log), # Deep clone before memory purge
             "cryptographic_proof": {
                 "algorithm": "SHA-256",
                 "hash": f"sha256:{sha256_hash}",

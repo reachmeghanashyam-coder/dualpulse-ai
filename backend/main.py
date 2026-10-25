@@ -123,9 +123,6 @@ def discharge_patient():
     report = agent.compile_archival_discharge_dossier(active_patient.dict(), latest_telemetry)
     
     # Safe memory purge (Law 12)
-    active_patient.status = "VACANT_READY_FOR_ADMIT"
-    active_patient.name = "Vacant Bed"
-    active_patient.patient_id = "NONE"
     agent.escalation_log.clear()
     engine.active_breach_type = "NONE"
     sim_state["event"] = "NONE"
