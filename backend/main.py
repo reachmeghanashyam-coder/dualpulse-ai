@@ -26,7 +26,7 @@ agent = ArchivalHospitalAgent(room_id="ICU_BED_04")
 class PatientProfile(BaseModel):
     patient_id: str = "PT-8821"
     name: str = "Robert Davis"
-    age: 68
+    age: int = 68
     diagnosis: str = "Post-Stroke Recovery / Neurological Care"
     acuity_mode: str = "HIGH_ACUITY_ICU"  # "HIGH_ACUITY_ICU" or "STEP_DOWN_RECOVERY"
     diet: str = "NPO (Strict Fasting - Post-Op)"
