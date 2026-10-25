@@ -37,3 +37,6 @@ yarn-error.log*
 Thumbs.db
 .vscode/
 .idea/
+
+# Inspection scratch
+tmp_inspect/
