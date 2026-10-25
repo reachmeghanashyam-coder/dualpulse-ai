@@ -11,7 +11,7 @@ import base64
 from vision_engine import ThreeTierClinicalVisionEngine
 from agent_core import ArchivalHospitalAgent
 
-app = FastAPI(title="DualPulse AI Clinical Triage System", version="3.1.0")
+app = FastAPI(title="DualPulse AI Clinical Triage System", version="3.2.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -42,7 +42,7 @@ class AcuityUpdate(BaseModel):
     acuity_mode: str
 
 class SimulationCommand(BaseModel):
-    command: str  # "NORMAL", "EXTUBATION", "SEIZURE", "FALL", "AGITATION", "RESET"
+    command: str  # "NORMAL", "EXTUBATION", "SEIZURE", "FALL", "AGITATION", "BLANKET_SHIFT", "RESET"
 
 class VideoSourceCommand(BaseModel):
     source: str  # "SIMULATION" or "WEBCAM"
@@ -53,6 +53,96 @@ sim_state = {
 }
 
 webcam_cap = None
+
+
+def synthesize_night_icu_frame(w: int, h: int, frame_idx: int, event: str) -> np.ndarray:
+    """
+    Synthesizes a 640x480 night-time ICU bed frame with realistic optical degradations:
+    - Low ambient night-ward illumination (mean pixel luminance ~26-38)
+    - Textured hospital mattress, bed rails, pillow, endotracheal tube, and patient anatomy
+    - Specular glare dome from a bedside vitals monitor (pixel saturation > 240)
+    - Thermal sensor noise and scenario-specific anatomical trajectories
+    """
+    rng = np.random.default_rng(seed=(frame_idx % 97) + 101)
+    frame = np.full((h, w, 3), 14, dtype=np.uint8)
+
+    # Subtle floor tile grid in dark room
+    for gx in range(80, 560, 48):
+        cv2.line(frame, (gx, 0), (gx, h), (19, 20, 22), 1)
+    for gy in range(40, h, 48):
+        cv2.line(frame, (80, gy), (560, gy), (19, 20, 22), 1)
+
+    # Bed frame and dark mattress
+    cv2.rectangle(frame, (120, 80), (520, 400), (30, 32, 36), -1)
+    cv2.rectangle(frame, (120, 80), (520, 400), (48, 52, 58), 2)
+    # Pillow at head of bed
+    cv2.rectangle(frame, (235, 92), (405, 165), (46, 48, 52), -1)
+
+    # Determine patient torso (px, py) and hand (hx, hy) coordinates by scenario
+    hx, hy = 230, 310
+    px, py = 320, 245
+
+    if event == "EXTUBATION_ATTEMPT":
+        # Hand sweeps upward toward endotracheal tube at neck
+        osc = int(np.sin(frame_idx * 0.45) * 9)
+        hx, hy = 312 + osc, 172 - abs(osc)
+        px, py = 320, 240
+    elif event == "SEIZURE":
+        shake_x = int(np.sin(frame_idx * 1.65) * 20)
+        shake_y = int(np.cos(frame_idx * 1.65) * 16)
+        px, py = 320 + shake_x, 242 + shake_y
+        hx, hy = 265 + shake_x, 255 - shake_y
+    elif event == "FALL":
+        # Patient swings across right/bottom bed perimeter onto floor
+        drift = int(np.sin(frame_idx * 0.35) * 10)
+        px, py = 320 + drift, 432
+        hx, hy = 335 + drift, 452
+    elif event in ["AGITATION", "BLANKET_SHIFT"]:
+        # Benign blanket shift / torso roll inside safe bed center (Abstention Test)
+        shift_x = int(np.sin(frame_idx * 0.55) * 24)
+        shift_y = int(np.cos(frame_idx * 0.55) * 12)
+        px, py = 320 + shift_x, 248 + shift_y
+        hx, hy = 245 + int(shift_x * 0.6), 298 + int(shift_y * 0.5)
+    else:
+        # Normal breathing micro-motion
+        breath = int(np.sin(frame_idx * 0.15) * 3)
+        px, py = 320, 242 + breath
+        hx, hy = 230, 310
+
+    # Patient torso & blanket folds (low-contrast night luminance so CLAHE visibly restores it)
+    cv2.ellipse(frame, (px, py + 20), (74, 105), 0, 0, 360, (54, 58, 62), -1)
+    # Blanket texture ribs so Farneback optical flow has rich spatial gradients once CLAHE runs
+    for r_offset in range(-65, 75, 18):
+        cv2.line(frame, (px - 58, py + 20 + r_offset), (px + 58, py + 25 + r_offset), (68, 72, 76), 2)
+
+    # Patient head & facial features
+    head_y = min(py - 92, 165) if event != "FALL" else py - 70
+    cv2.circle(frame, (px, head_y), 36, (66, 70, 74), -1)
+
+    # Endotracheal airway tube & central line catheter
+    cv2.line(frame, (220, 115), (318, 172), (82, 86, 92), 3)
+    cv2.circle(frame, (318, 172), 6, (95, 100, 105), -1)
+
+    # Patient active arm & hand
+    cv2.line(frame, (px - 45, py - 15), (hx, hy), (64, 68, 72), 14)
+    cv2.circle(frame, (hx, hy), 14, (78, 82, 88), -1)
+
+    # Realistic Optical Failure Mode 1: Specular Glare Dome from Bedside Vitals Monitor
+    # Placed over the upper-left airway/head zone to blind naive open-loop trackers
+    glare_layer = np.zeros_like(frame)
+    cv2.circle(glare_layer, (265, 168), 38, (252, 252, 255), -1)
+    cv2.circle(glare_layer, (185, 130), 26, (245, 245, 250), -1)
+    glare_layer = cv2.GaussianBlur(glare_layer, (25, 25), 9.0)
+    frame = cv2.add(frame, glare_layer)
+
+    # Realistic Optical Failure Mode 2: Slight motion blur on seizure + sensor shot noise
+    if event == "SEIZURE":
+        frame = cv2.GaussianBlur(frame, (5, 5), 1.4)
+
+    noise = rng.integers(-6, 7, size=(h, w, 1), dtype=np.int16)
+    frame = np.clip(frame.astype(np.int16) + noise, 0, 255).astype(np.uint8)
+    return frame
+
 
 @app.get("/")
 def read_root():
@@ -92,7 +182,6 @@ def resolve_incident():
     now = time.time()
     last_breach = engine.active_breach_type
     
-    # Mark resolved in agent audit trail
     agent.escalation_log.append({
         "event_id": f"RESOLVE-{int(now * 1000)}",
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now)),
@@ -102,7 +191,6 @@ def resolve_incident():
         "patient_id": active_patient.patient_id
     })
     
-    # Reset engine and simulation state
     engine.reset_line_security()
     engine.active_breach_type = "NONE"
     engine.incident_duration = 0.0
@@ -118,11 +206,10 @@ def resolve_incident():
 @app.post("/api/patient/discharge")
 def discharge_patient():
     """Discharges patient, compiles final EHR dossier with SHA-256 hash, and purges session memory."""
-    dummy_frame = np.full((480, 640, 3), 120, dtype=np.uint8)
-    latest_telemetry = engine.process_frame(dummy_frame)
+    dummy_frame = synthesize_night_icu_frame(640, 480, 1, "NONE")
+    latest_telemetry = engine.process_frame(dummy_frame, encode_visual=False)
     report = agent.compile_archival_discharge_dossier(active_patient.dict(), latest_telemetry)
     
-    # Safe memory purge (Law 12)
     agent.escalation_log.clear()
     engine.active_breach_type = "NONE"
     sim_state["event"] = "NONE"
@@ -154,11 +241,11 @@ def set_video_source(cmd: VideoSourceCommand):
 
 @app.post("/api/eval/simulate")
 def set_simulation(cmd: SimulationCommand):
-    """1-Click Evaluation Mode for Judges: Normal, Extubation, Seizure, Fall, Agitation."""
+    """1-Click Evaluation Mode for Judges: Normal, Extubation, Seizure, Fall, Blanket_Shift (Abstention)."""
     if cmd.command == "EXTUBATION":
         sim_state["event"] = "EXTUBATION_ATTEMPT"
-    elif cmd.command in ["SEIZURE", "FALL", "AGITATION"]:
-        sim_state["event"] = cmd.command
+    elif cmd.command in ["SEIZURE", "FALL", "AGITATION", "BLANKET_SHIFT"]:
+        sim_state["event"] = "BLANKET_SHIFT" if cmd.command in ["AGITATION", "BLANKET_SHIFT"] else cmd.command
     else:
         sim_state["event"] = "NONE"
         engine.reset_line_security()
@@ -191,52 +278,29 @@ async def websocket_telemetry(websocket: WebSocket):
             frame_idx += 1
             global webcam_cap
             
-            # Choose frame source: live physical camera vs synthetic simulation
+            is_live_cam = False
             if sim_state["video_source"] == "WEBCAM" and webcam_cap is not None and webcam_cap.isOpened():
                 ret, live_frame = webcam_cap.read()
                 if ret and live_frame is not None:
                     frame = cv2.resize(live_frame, (w, h))
+                    is_live_cam = True
                 else:
-                    frame = np.full((h, w, 3), 20, dtype=np.uint8)
+                    frame = synthesize_night_icu_frame(w, h, frame_idx, sim_state["event"])
             else:
-                frame = np.full((h, w, 3), 20, dtype=np.uint8)
-                
-                # Position simulation based on event
-                if sim_state["event"] == "SEIZURE":
-                    shake_x = int(np.sin(frame_idx * 1.5) * 18)
-                    shake_y = int(np.cos(frame_idx * 1.5) * 18)
-                    px, py = 320 + shake_x, 240 + shake_y
-                elif sim_state["event"] == "FALL":
-                    px, py = 320, 440
-                elif sim_state["event"] == "AGITATION":
-                    px = 320 + int(np.sin(frame_idx * 0.4) * 22)
-                    py = 240 + int(np.cos(frame_idx * 0.4) * 8)
-                else:
-                    px, py = 320, 240
-                    
-                # Draw synthetic patient & bed frame
-                cv2.rectangle(frame, (120, 90), (520, 390), (50, 50, 25), 2)
-                cv2.ellipse(frame, (px, py), (70, 110), 0, 0, 360, (180, 160, 140), -1)
-                cv2.circle(frame, (px, py - 90), 40, (200, 180, 160), -1)
+                frame = synthesize_night_icu_frame(w, h, frame_idx, sim_state["event"])
             
-            # 1. OpenCV 5 Adaptive Vision Engine
-            telemetry = engine.process_frame(frame, simulated_event=sim_state["event"])
-            
-            # If in WEBCAM mode, stream compressed JPEG video frame for live canvas rendering
-            if sim_state["video_source"] == "WEBCAM":
-                # Annotate optical flow ROI tripwires onto live frame for visual proof
-                annotated = frame.copy()
-                cv2.rectangle(annotated, (120, 90), (520, 390), (0, 229, 255), 2) # Bed perimeter tripwire
-                cv2.rectangle(annotated, (280, 150), (360, 210), (0, 0, 255) if telemetry.get("active_breach") == "UNPLANNED_EXTUBATION_RISK" else (255, 200, 0), 2)
-                cv2.putText(annotated, "OPENCV 5 AIRWAY TRIPWIRE", (240, 140), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 229, 255), 1)
-                
-                _, buffer = cv2.imencode('.jpg', annotated, [cv2.IMWRITE_JPEG_QUALITY, 55])
-                telemetry["video_frame_b64"] = base64.b64encode(buffer).decode('utf-8')
-                telemetry["is_live_camera"] = True
+            # 1. Closed-Loop OpenCV 5 Vision Engine (Perceive -> Condition -> Verify -> Track -> Decide/Abstain)
+            # Encode split-screen visual proof every 2nd frame (~15 FPS visual stream, 30 FPS telemetry)
+            encode_now = (frame_idx % 2 == 0) or (frame_idx == 1)
+            telemetry = engine.process_frame(frame, simulated_event=sim_state["event"], encode_visual=encode_now)
+            if not encode_now and hasattr(engine, "_last_b64"):
+                telemetry["video_frame_b64"] = engine._last_b64
             else:
-                telemetry["is_live_camera"] = False
+                engine._last_b64 = telemetry.get("video_frame_b64")
+
+            telemetry["is_live_camera"] = is_live_cam
             
-            # 2. Multi-Tier Clinical Agent
+            # 2. Multi-Tier Clinical Agent (Escalates hazards or logs False-Alarm Abstention)
             agent_decision = agent.evaluate(telemetry, active_patient.dict())
             telemetry["agent"] = agent_decision
             telemetry["patient"] = active_patient.dict()
