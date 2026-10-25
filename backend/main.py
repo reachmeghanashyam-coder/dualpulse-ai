@@ -6,6 +6,7 @@ import numpy as np
 import cv2
 import json
 import time
+import base64
 
 from vision_engine import ThreeTierClinicalVisionEngine
 from agent_core import ArchivalHospitalAgent
@@ -83,6 +84,35 @@ def secure_lines():
         "status": "LINE_SECURED",
         "line_integrity": engine.line_integrity_status,
         "total_interventions_logged": engine.total_interventions_logged
+    }
+
+@app.post("/api/patient/resolve")
+def resolve_incident():
+    """Attends to active breach, resets alarm state, and logs nurse intervention in audit trail."""
+    now = time.time()
+    last_breach = engine.active_breach_type
+    
+    # Mark resolved in agent audit trail
+    agent.escalation_log.append({
+        "event_id": f"RESOLVE-{int(now * 1000)}",
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now)),
+        "breach_type": "RESOLVED_BY_NURSE",
+        "resolved_incident": last_breach,
+        "action_taken": "Bedside Attended & Bed Tripped Alarms Cleared by Nurse Sarah Jenkins, RN",
+        "patient_id": active_patient.patient_id
+    })
+    
+    # Reset engine and simulation state
+    engine.reset_line_security()
+    engine.active_breach_type = "NONE"
+    engine.incident_duration = 0.0
+    sim_state["event"] = "NONE"
+    
+    return {
+        "status": "INCIDENT_RESOLVED",
+        "resolved_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now)),
+        "assigned_nurse": "Nurse Sarah Jenkins, RN",
+        "current_breach": "NONE"
     }
 
 @app.post("/api/patient/discharge")
@@ -194,6 +224,20 @@ async def websocket_telemetry(websocket: WebSocket):
             
             # 1. OpenCV 5 Adaptive Vision Engine
             telemetry = engine.process_frame(frame, simulated_event=sim_state["event"])
+            
+            # If in WEBCAM mode, stream compressed JPEG video frame for live canvas rendering
+            if sim_state["video_source"] == "WEBCAM":
+                # Annotate optical flow ROI tripwires onto live frame for visual proof
+                annotated = frame.copy()
+                cv2.rectangle(annotated, (120, 90), (520, 390), (0, 229, 255), 2) # Bed perimeter tripwire
+                cv2.rectangle(annotated, (280, 150), (360, 210), (0, 0, 255) if telemetry.get("active_breach") == "UNPLANNED_EXTUBATION_RISK" else (255, 200, 0), 2)
+                cv2.putText(annotated, "OPENCV 5 AIRWAY TRIPWIRE", (240, 140), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 229, 255), 1)
+                
+                _, buffer = cv2.imencode('.jpg', annotated, [cv2.IMWRITE_JPEG_QUALITY, 55])
+                telemetry["video_frame_b64"] = base64.b64encode(buffer).decode('utf-8')
+                telemetry["is_live_camera"] = True
+            else:
+                telemetry["is_live_camera"] = False
             
             # 2. Multi-Tier Clinical Agent
             agent_decision = agent.evaluate(telemetry, active_patient.dict())
