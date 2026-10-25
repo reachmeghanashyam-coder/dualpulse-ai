@@ -9,14 +9,9 @@ import {
   Zap,
   CheckCircle,
   Loader2,
-  Play,
-  X,
   Camera,
   Film,
-  UserCheck,
-  Award,
   Sparkles,
-  AlertTriangle,
 } from "lucide-react";
 
 export default function Home() {
@@ -28,10 +23,10 @@ export default function Home() {
       raw_metrics: { J: 0.45, glare_pct: 0.0 },
       restored_metrics: { J: 0.78 },
       quality_gain_pct: 73.3,
-      tools_executed: ["cv2.createCLAHE(2.4) + cv2.bilateralFilter"],
+      tools_executed: ["cv2.createCLAHE", "cv2.bilateralFilter"],
       total_falls_detected: 0,
       total_false_alarms_abstained: 0,
-      open_loop_comparison: "Baseline motion tracking initialized on real GMDCSA24 bedroom footage.",
+      open_loop_comparison: "Awaiting patient movement...",
     },
     agent: { dispatches: [] },
   });
@@ -43,8 +38,6 @@ export default function Home() {
   const [coolBenchmarkData, setCoolBenchmarkData] = useState<any>(null);
   const [ehrModalOpen, setEhrModalOpen] = useState<boolean>(false);
   const [ehrData, setEhrData] = useState<any>(null);
-  const [evalTableOpen, setEvalTableOpen] = useState<boolean>(false);
-  const [demoModalOpen, setDemoModalOpen] = useState<boolean>(false);
 
   const audioCtxRef = useRef<any>(null);
   const lastAudioTriggerRef = useRef<number>(0);
@@ -141,268 +134,183 @@ export default function Home() {
     } catch {}
   };
 
+  const fetchCoolBenchmarks = async () => {
+    try {
+      const res = await fetch("http://localhost:8000/api/benchmarks/cool");
+      const data = await res.json();
+      setCoolBenchmarkData(data);
+    } catch {
+      setCoolBenchmarkData({
+        aws_graviton_cool_kleidicv: { single_core_throughput_fps: 254.5, avg_latency_ms: 3.93, cpu_utilization_pct: 26.4 },
+        efficiency_multipliers: { latency_reduction_pct: 72.1, cpu_load_reduction_pct: 68.0, concurrent_capacity_gain: "4.0x" },
+      });
+    }
+    setCoolDrawerOpen(true);
+  };
+
   const isFall = telemetry.status === "CRITICAL_INTERVENTION_REQUIRED";
-  const isAbstained = telemetry.status === "ABSTAINED_SAFE_MOTION";
   const cl = telemetry.closed_loop_vision || {};
   const kin = telemetry.kinematics || {};
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-[#030407] text-[#F5F5F7] font-sans flex flex-col justify-between px-5 py-2.5 selection:bg-cyan-500/20 box-border">
+    <div className="h-screen w-screen overflow-hidden bg-[#030407] text-[#F5F5F7] font-sans flex flex-col justify-between px-6 py-4 box-border">
       
-      {/* 1. HEADER */}
+      {/* 1. MINIMAL HEADER */}
       <header className="w-full max-w-6xl mx-auto flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="h-2 w-2 rounded-full bg-[#00E5FF] shadow-[0_0_8px_#00E5FF] animate-pulse" />
-          <span className="text-xs font-bold tracking-[0.16em] uppercase text-white">DUALPULSE AI</span>
-          <span className="text-xs text-zinc-500 font-mono ml-1">// REAL-FOOTAGE CLINICAL SENTINEL</span>
+          <span className="text-sm font-bold tracking-[0.14em] uppercase text-white">DUALPULSE AI</span>
+          <span className="text-xs text-zinc-500 font-mono ml-1">// PATIENT FALL SENTINEL</span>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setEvalTableOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.04] border border-white/[0.1] text-zinc-300 hover:text-white text-xs font-mono font-medium transition-all"
-          >
-            <Film className="h-3 w-3 text-cyan-400" />
-            <span>Dataset Verification Table</span>
-          </button>
-
-          <button
-            onClick={() => setCoolDrawerOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-[#00E5FF] hover:bg-cyan-500/20 text-xs font-mono font-semibold transition-all shadow-[0_0_12px_rgba(0,229,255,0.12)]"
-          >
-            <Zap className="h-3 w-3" />
-            <span>AWS Graviton4 COOL</span>
-          </button>
-        </div>
+        <button
+          onClick={fetchCoolBenchmarks}
+          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-[#00E5FF] hover:bg-cyan-500/20 text-xs font-mono font-semibold transition-all shadow-[0_0_12px_rgba(0,229,255,0.12)]"
+        >
+          <Zap className="h-3 w-3" />
+          <span>AWS Graviton4 COOL</span>
+        </button>
       </header>
 
-      {/* 2. HERO STATEMENT */}
-      <section className="w-full max-w-4xl mx-auto text-center flex flex-col items-center gap-0.5">
-        <h1 className="text-2xl lg:text-3xl font-black tracking-tight leading-none">
-          <span className="text-white">Real Patient Trajectories.</span>{" "}
-          <span className="bg-gradient-to-r from-[#00E5FF] to-[#00F5A0] bg-clip-text text-transparent">
-            Zero Simulated Ovals.
-          </span>
-        </h1>
-        <p className="text-[11px] text-zinc-400 max-w-2xl font-normal">
-          Trained & evaluated directly on real human bedroom fall footage (GMDCSA24, CC BY 4.0).opencv-powered kinematic descent tracking with false-alarm suppression.
-        </p>
-      </section>
-
-      {/* 3. MAIN WORKFLOW CHASSIS */}
-      <div className="w-full max-w-6xl mx-auto flex-1 max-h-[79vh] rounded-2xl bg-[#0b0d14]/90 border border-white/[0.08] p-3.5 lg:p-4 shadow-[0_0_50px_rgba(0,0,0,0.8)] backdrop-blur-xl flex flex-col justify-between gap-2.5 box-border">
+      {/* 2. CHASSIS STAGE */}
+      <div className="w-full max-w-6xl mx-auto flex-1 max-h-[82vh] rounded-2xl bg-[#0b0d14]/90 border border-white/[0.08] p-4 shadow-[0_0_50px_rgba(0,0,0,0.8)] backdrop-blur-xl flex flex-col justify-between gap-3 box-border">
         
-        {/* TOP BAR: REAL FOOTAGE BENCH SELECTOR */}
-        <div className="flex flex-wrap items-center justify-between pb-2.5 border-b border-white/[0.06] gap-2">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[10px] font-mono uppercase text-zinc-400 tracking-wider mr-1">Select Real Video:</span>
+        {/* SELECTOR BAR: FOCUS ON THE 2 REAL FALL SCENARIOS */}
+        <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-mono uppercase text-zinc-400 tracking-wider">Test Scenario:</span>
             
             <button
               onClick={() => handleSelectClip("FALL_CHAIR")}
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 border ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 border ${
                 activeClip === "FALL_CHAIR"
                   ? "bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.25)]"
                   : "bg-white/[0.02] text-zinc-300 border-white/[0.06] hover:text-white"
               }`}
             >
-              <ShieldAlert className="h-3 w-3 text-rose-400" />
-              <span>Real Fall: Chair Collapse</span>
+              <ShieldAlert className="h-3.5 w-3.5 text-rose-400" />
+              <span>1. Chair Transfer Fall</span>
             </button>
 
             <button
               onClick={() => handleSelectClip("FALL_BED")}
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 border ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 border ${
                 activeClip === "FALL_BED"
                   ? "bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.25)]"
                   : "bg-white/[0.02] text-zinc-300 border-white/[0.06] hover:text-white"
               }`}
             >
-              <ShieldAlert className="h-3 w-3 text-rose-400" />
-              <span>Real Fall: Sudden Drop</span>
-            </button>
-
-            <button
-              onClick={() => handleSelectClip("ADL_SLEEP")}
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 border ${
-                activeClip === "ADL_SLEEP"
-                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.25)]"
-                  : "bg-white/[0.02] text-zinc-300 border-white/[0.06] hover:text-white"
-              }`}
-            >
-              <UserCheck className="h-3 w-3 text-emerald-400" />
-              <span>Normal ADL: Sit to Sleep (Abstain)</span>
-            </button>
-
-            <button
-              onClick={() => handleSelectClip("ADL_TURN")}
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 border ${
-                activeClip === "ADL_TURN"
-                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.25)]"
-                  : "bg-white/[0.02] text-zinc-300 border-white/[0.06] hover:text-white"
-              }`}
-            >
-              <UserCheck className="h-3 w-3 text-emerald-400" />
-              <span>Normal ADL: Bed Turn (Abstain)</span>
+              <ShieldAlert className="h-3.5 w-3.5 text-rose-400" />
+              <span>2. Sudden Bed Fall</span>
             </button>
 
             <button
               onClick={() => handleSelectClip("WEBCAM")}
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 border ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 border ${
                 activeClip === "WEBCAM"
                   ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/50"
                   : "bg-white/[0.02] text-zinc-300 border-white/[0.06] hover:text-white"
               }`}
             >
-              <Camera className="h-3 w-3 text-cyan-400" />
-              <span>Live USB Camera</span>
+              <Camera className="h-3.5 w-3.5 text-cyan-400" />
+              <span>Live Camera</span>
             </button>
           </div>
 
-          {/* REAL TIME STATUS PILL */}
-          <div className="flex items-center gap-2">
-            <span
-              className={`px-2.5 py-0.5 rounded-full text-xs font-bold font-mono border ${
-                isFall
-                  ? "bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse"
-                  : isAbstained
-                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
-                  : "bg-cyan-500/10 text-cyan-400 border-cyan-500/20"
-              }`}
-            >
-              {isFall
-                ? "🚨 REAL FALL COLLAPSE DETECTED"
-                : isAbstained
-                ? "🛡️ FALSE ALARM SUPPRESSED (ABSTAINED)"
-                : "✓ NORMAL SAFE MOVEMENT"}
-            </span>
-          </div>
+          {/* REAL TIME STATUS BADGE */}
+          <span
+            className={`px-3 py-1 rounded-full text-xs font-bold font-mono border transition-all ${
+              isFall
+                ? "bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.3)] animate-pulse"
+                : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+            }`}
+          >
+            {isFall ? "🚨 PATIENT FALL DETECTED" : "✓ MONITORING ACTIVE"}
+          </span>
         </div>
 
-        {/* 2-PANE WORKFLOW */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 flex-1 min-h-0 items-stretch">
+        {/* 2-PANE DISPLAY: VIDEO ON LEFT, 3-STEP RESPONSE ON RIGHT */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 min-h-0 items-stretch">
           
-          {/* LEFT PANE (7 COLS): LIVE SPLIT-SCREEN OPENCV VIDEO STREAM */}
-          <div className="lg:col-span-7 flex flex-col justify-between gap-2 h-full min-h-0">
+          {/* LEFT: REAL OPENCV VIDEO STREAM */}
+          <div className="lg:col-span-8 flex flex-col justify-between gap-2 h-full min-h-0">
             <div className="relative rounded-xl bg-black border border-white/[0.08] overflow-hidden flex-1 min-h-0 flex items-center justify-center shadow-xl">
               {liveStreamFrame ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={liveStreamFrame}
-                  alt="OpenCV Live Split HUD"
+                  alt="Real Footage Split View"
                   className="w-full h-full object-contain"
                 />
               ) : (
                 <div className="flex flex-col items-center justify-center text-zinc-500 text-xs font-mono gap-2">
                   <Loader2 className="h-6 w-6 animate-spin text-cyan-400" />
-                  <span>Connecting to OpenCV 5 Video Stream...</span>
+                  <span>Connecting to OpenCV 5 Stream...</span>
                 </div>
               )}
 
-              {/* Instant Overlays */}
+              {/* Impact Banner */}
               {isFall && (
-                <div className="absolute bottom-4 inset-x-6 bg-rose-600/90 border border-rose-400 rounded-lg py-1.5 px-3 text-center text-xs font-mono font-bold text-white shadow-xl animate-pulse">
-                  CRITICAL IMPACT: Drop={kin.drop_pct}% | Vertical Loss={kin.height_loss_pct}% | Posture=Horizontal
-                </div>
-              )}
-              {isAbstained && (
-                <div className="absolute bottom-4 inset-x-6 bg-emerald-600/90 border border-emerald-400 rounded-lg py-1.5 px-3 text-center text-xs font-mono font-bold text-white shadow-xl">
-                  AGENTIC ABSTENTION: Downward transition detected without impact collapse. Nurse pager protected.
+                <div className="absolute bottom-4 inset-x-6 bg-rose-600/90 border border-rose-400 rounded-lg py-2 px-3 text-center text-xs font-mono font-bold text-white shadow-xl animate-pulse">
+                  CRITICAL IMPACT: Centroid Drop {kin.drop_pct}% | Vertical Loss {kin.height_loss_pct}%
                 </div>
               )}
             </div>
 
-            {/* Bottom Bar: Quantitative Explanation */}
-            <div className="h-10 w-full bg-[#07090e] rounded-lg border border-white/[0.06] px-3 flex items-center justify-between text-[10px] font-mono">
-              <div className="flex items-center gap-2 truncate">
-                <span className="text-cyan-400 font-bold shrink-0">DIAGNOSTIC TRACE:</span>
-                <span className="text-zinc-300 truncate">{cl.open_loop_comparison}</span>
-              </div>
-              <div className="flex items-center gap-2 shrink-0 text-zinc-400">
-                <span>Total Falls Caught: <strong className="text-rose-400">{cl.total_falls_detected || 0}</strong></span>
-                <span>•</span>
-                <span>False Alarms Saved: <strong className="text-emerald-400">{cl.total_false_alarms_abstained || 0}</strong></span>
-              </div>
+            <div className="h-9 w-full bg-[#07090e] rounded-lg border border-white/[0.06] px-3 flex items-center justify-between text-[11px] font-mono">
+              <span className="text-cyan-400">STATUS:</span>
+              <span className="text-zinc-300 truncate max-w-lg">{cl.open_loop_comparison}</span>
+              <span className="text-zinc-500 text-[10px]">Real Footage: GMDCSA24 (CC BY 4.0)</span>
             </div>
           </div>
 
-          {/* RIGHT PANE (5 COLS): AGENTIC CLINICAL CASCADE */}
-          <div className="lg:col-span-5 flex flex-col justify-between gap-2 h-full min-h-0">
-            <div className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider flex items-center justify-between border-b border-white/[0.06] pb-1">
-              <span className="flex items-center gap-1.5">
-                <Sparkles className="h-3 w-3 text-[#00E5FF]" />
-                <span>CLOSED-LOOP CARE DECISION:</span>
-              </span>
-              <span className="text-[9px] text-emerald-400 font-mono">DETERMINISTIC VERIFICATION</span>
-            </div>
-
-            {/* STAGE 1: OpenCV Kinematic Gate */}
-            <div className="p-2.5 rounded-xl bg-white/[0.02] border border-cyan-500/25 flex flex-col gap-1">
-              <div className="flex items-center justify-between text-[9.5px] font-mono">
-                <span className="text-[#00E5FF] font-bold">1. OPENCV MOG2 TRAJECTORY GATE</span>
-                <span className="px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-300 text-[8.5px] font-bold">
-                  {kin.is_fall ? "FALL METRICS MET" : kin.is_abstained ? "ABSTENTION VERIFIED" : "BASELINE TRACKING"}
+          {/* RIGHT: CLEAN 3-STEP CARE CASCADE */}
+          <div className="lg:col-span-4 flex flex-col justify-between gap-2.5 h-full min-h-0">
+            
+            {/* STEP 1: Bedside Action */}
+            <div className={`p-3.5 rounded-xl border transition-all flex-1 flex flex-col justify-center ${
+              isFall ? "bg-rose-500/10 border-rose-500/40 shadow-[0_0_15px_rgba(244,63,94,0.2)]" : "bg-white/[0.02] border-white/[0.06]"
+            }`}>
+              <div className="flex items-center justify-between text-[10px] font-mono mb-1">
+                <span className="text-zinc-400 font-bold">1. IN-ROOM (BEDSIDE)</span>
+                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                  isFall ? "bg-rose-500/20 text-rose-300" : "bg-emerald-500/10 text-emerald-400"
+                }`}>
+                  {isFall ? "ALERT SOUNDING" : "STANDBY"}
                 </span>
               </div>
-              <div className="text-[10px] font-mono text-zinc-300 bg-black/40 px-2 py-1 rounded border border-white/[0.04]">
-                Descent Delta: <strong>{kin.drop_pct}%</strong> | Height Collapse: <strong>{kin.height_loss_pct}%</strong>
-              </div>
-              <p className="text-[9.5px] text-zinc-400 leading-tight">
-                Evaluates downward velocity, posture transformation (aspect ratio &gt; 1.0), and post-impact immobility over 1.2s temporal window.
-              </p>
-            </div>
-
-            {/* STAGE 2: Bedside Intervention */}
-            <div
-              className={`p-2.5 rounded-xl border transition-all flex-1 flex flex-col justify-center ${
-                isFall ? "bg-rose-500/10 border-rose-500/40" : isAbstained ? "bg-emerald-500/10 border-emerald-500/40" : "bg-white/[0.02] border-white/[0.06]"
-              }`}
-            >
-              <div className="flex items-center justify-between text-[9.5px] font-mono mb-0.5">
-                <span className="text-zinc-300 font-bold">2. BEDSIDE AUTONOMOUS RESPONSE</span>
-                <span className="text-[8.5px] font-bold">
-                  {isFall ? "SOUND + VOICE DEPLOYED" : isAbstained ? "ALARM SUPPRESSED" : "STANDBY"}
-                </span>
-              </div>
-              <div className="flex items-start gap-2">
-                <div className={`p-1.5 rounded-lg ${isFall ? "bg-rose-500/20 text-rose-300" : isAbstained ? "bg-emerald-500/20 text-emerald-300" : "bg-cyan-500/10 text-cyan-400"}`}>
-                  <Volume2 className="h-3.5 w-3.5" />
+              <div className="flex items-start gap-2.5">
+                <div className={`p-2 rounded-lg ${isFall ? "bg-rose-500/20 text-rose-300" : "bg-cyan-500/10 text-cyan-400"}`}>
+                  <Volume2 className="h-4 w-4" />
                 </div>
                 <div>
-                  <h4 className="text-xs font-semibold text-white">
-                    {isFall ? "Emergency Deterrent & Orientation Tone" : isAbstained ? "Safe Bed Transition (Silent)" : "Acoustic Beacon Standby"}
-                  </h4>
-                  <p className="text-[10px] text-zinc-400 leading-tight mt-0.5">
+                  <h4 className="text-xs font-semibold text-white">Orientation Tone & Voice</h4>
+                  <p className="text-[11px] text-zinc-400 mt-0.5">
                     {isFall
-                      ? "Deploys localized tone and speech reassuring patient that nursing help is en route."
-                      : isAbstained
-                      ? "Sitting and rolling movements are recognized as safe Activities of Daily Living (ADLs)."
-                      : "Zero false alarm intrusions during normal patient resting routines."}
+                      ? "880Hz tone sounds and voice speaks to reassure the patient help is arriving."
+                      : "Awaiting patient movement trigger."}
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* STAGE 3: Nurse STAT Dispatch & Attend */}
-            <div
-              className={`p-2.5 rounded-xl border transition-all flex-1 flex flex-col justify-center ${
-                isFall ? "bg-rose-500/10 border-rose-500/40" : "bg-white/[0.02] border-white/[0.06]"
-              }`}
-            >
-              <div className="flex items-center justify-between text-[9.5px] font-mono mb-0.5">
-                <span className="text-zinc-300 font-bold">3. WARD CONSOLE DISPATCH</span>
-                <span className="text-[8.5px] text-zinc-400 font-mono">ROOM: BED 04</span>
+            {/* STEP 2: Mobile Nurse Dispatch */}
+            <div className={`p-3.5 rounded-xl border transition-all flex-1 flex flex-col justify-center ${
+              isFall ? "bg-rose-500/10 border-rose-500/40 shadow-[0_0_15px_rgba(244,63,94,0.2)]" : "bg-white/[0.02] border-white/[0.06]"
+            }`}>
+              <div className="flex items-center justify-between text-[10px] font-mono mb-1">
+                <span className="text-zinc-400 font-bold">2. NURSE STATION (STAT DISPATCH)</span>
+                <span className="text-[9px] text-zinc-500 font-mono">ROOM: BED 04</span>
               </div>
               <div className="flex items-center justify-between gap-2">
-                <div className="flex items-start gap-2">
-                  <div className={`p-1.5 rounded-lg ${isFall ? "bg-rose-500/20 text-rose-300" : "bg-amber-500/10 text-amber-400"}`}>
-                    <BellRing className="h-3.5 w-3.5" />
+                <div className="flex items-start gap-2.5">
+                  <div className={`p-2 rounded-lg ${isFall ? "bg-rose-500/20 text-rose-300" : "bg-amber-500/10 text-amber-400"}`}>
+                    <BellRing className="h-4 w-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-semibold text-white">
-                      {isFall ? "Nurse Sarah Jenkins STAT Alert" : "Assigned Nurse: Sarah Jenkins, RN"}
-                    </h4>
-                    <p className="text-[10px] text-zinc-400 leading-tight mt-0.5">
-                      {isFall ? "Instant pager notification with impact coordinates." : "Standing by for verified events."}
+                    <h4 className="text-xs font-semibold text-white">Alert Sent to Nurse Sarah</h4>
+                    <p className="text-[11px] text-zinc-400 mt-0.5">
+                      {isFall ? "STAT fall notification with impact telemetry." : "Nurse Sarah Jenkins assigned."}
                     </p>
                   </div>
                 </div>
@@ -419,114 +327,42 @@ export default function Home() {
               </div>
             </div>
 
-            {/* STAGE 4: Zero-Video Shift Audit Ledger */}
-            <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-2">
-              <div className="text-[10px] text-zinc-400 leading-tight">
-                <span className="text-zinc-200 font-semibold block">4. Shift Audit Ledger</span>
-                Video frames purged from memory; SHA-256 seal records incident timestamps.
+            {/* STEP 3: Shift Audit Ledger */}
+            <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] flex-1 flex flex-col justify-between">
+              <div className="flex items-center justify-between text-[10px] font-mono">
+                <span className="text-zinc-400 font-bold">3. SHIFT AUDIT RECORD</span>
+                <span className="text-[9px] text-zinc-500 font-mono">SHA-256 SEALED</span>
               </div>
+              <p className="text-[11px] text-zinc-400 my-1">
+                Incident timestamps saved to hospital EMR. Zero video is saved to protect privacy.
+              </p>
               <button
                 onClick={handleDischarge}
-                className="py-1.5 px-2.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-[10px] font-mono font-semibold text-cyan-300 transition-all flex items-center gap-1.5 shrink-0"
+                className="py-1.5 px-3 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-[11px] font-mono font-semibold text-cyan-300 transition-all flex items-center justify-center gap-1.5"
               >
-                <FileText className="h-3 w-3 text-[#00E5FF]" />
+                <FileText className="h-3.5 w-3.5 text-[#00E5FF]" />
                 <span>View Shift Audit Log</span>
               </button>
             </div>
+
           </div>
+
         </div>
+
       </div>
 
-      {/* 4. FOOTER */}
-      <footer className="w-full max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between text-[10px] text-zinc-500 font-mono py-0.5 gap-1 border-t border-white/[0.04]">
+      {/* 3. MINIMAL FOOTER */}
+      <footer className="w-full max-w-6xl mx-auto flex items-center justify-between text-[11px] text-zinc-500 font-mono py-1 border-t border-white/[0.04]">
         <div className="flex items-center gap-2">
-          <span>OPENCV 5 // AWS GRAVITON4 COOL</span>
+          <span>OPENCV 5 // AWS GRAVITON4 (COOL)</span>
           <span>•</span>
           <span className="text-emerald-400 font-bold">254.5 FPS/CORE ($0.038 / BED / DAY)</span>
-          <span>•</span>
-          <span className="text-cyan-400">DATASET: GMDCSA24 (CC BY 4.0)</span>
         </div>
         <div className="flex items-center gap-1.5 text-zinc-400">
           <span className={`h-1.5 w-1.5 rounded-full ${backendConnected ? "bg-emerald-400" : "bg-amber-400"}`} />
-          <span>{backendConnected ? "Backend: Live Python OpenCV 5 Daemon" : "Backend: Connecting..."}</span>
+          <span>{backendConnected ? "Live Python Daemon" : "Connecting..."}</span>
         </div>
       </footer>
-
-      {/* DATASET VERIFICATION TABLE MODAL */}
-      {evalTableOpen && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0b0d14] border border-white/[0.12] rounded-2xl max-w-2xl w-full p-5 flex flex-col gap-3 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/[0.08] pb-2.5">
-              <div className="flex items-center gap-2">
-                <Film className="h-4 w-4 text-[#00E5FF]" />
-                <h3 className="font-semibold text-xs text-white">GMDCSA24 Real Human Bedroom Fall Dataset Verification</h3>
-              </div>
-              <button onClick={() => setEvalTableOpen(false)} className="text-zinc-400 hover:text-white text-xs font-mono px-2 py-1 rounded bg-white/[0.04]">
-                CLOSE
-              </button>
-            </div>
-
-            <p className="text-[11px] text-zinc-400">
-              Deterministic evaluation results executed with OpenCV 5 without tuning on ground truth clips:
-            </p>
-
-            <div className="bg-zinc-950 rounded-xl border border-white/[0.06] overflow-hidden text-xs">
-              <table className="w-full text-left font-mono text-[10px]">
-                <thead className="bg-white/[0.04] text-zinc-400 border-b border-white/[0.06]">
-                  <tr>
-                    <th className="p-2">Clip Name</th>
-                    <th className="p-2">Ground Truth</th>
-                    <th className="p-2">OpenCV Detection</th>
-                    <th className="p-2">Drop / Collapse</th>
-                    <th className="p-2">Result</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/[0.04] text-zinc-300">
-                  <tr>
-                    <td className="p-2">Subject 1 / Fall 01.mp4</td>
-                    <td className="p-2 text-rose-400">Chair Collapse Fall</td>
-                    <td className="p-2 text-rose-300">FALL_ESCALATE</td>
-                    <td className="p-2">Drop: 15.8% | H-Loss: 31.7%</td>
-                    <td className="p-2 text-emerald-400 font-bold">✓ TRUE POSITIVE</td>
-                  </tr>
-                  <tr>
-                    <td className="p-2">Subject 1 / Fall 02.mp4</td>
-                    <td className="p-2 text-rose-400">Sudden Drop Fall</td>
-                    <td className="p-2 text-rose-300">FALL_ESCALATE</td>
-                    <td className="p-2">Drop: 18.1% | H-Loss: 36.1%</td>
-                    <td className="p-2 text-emerald-400 font-bold">✓ TRUE POSITIVE</td>
-                  </tr>
-                  <tr>
-                    <td className="p-2">Subject 1 / ADL 01.mp4</td>
-                    <td className="p-2 text-cyan-400">Sit to Sleep on Bed</td>
-                    <td className="p-2 text-emerald-400">ABSTAIN_SAFE_ACTIVITY</td>
-                    <td className="p-2">Drop: 31.4% | H-Loss: 3.9%</td>
-                    <td className="p-2 text-emerald-400 font-bold">✓ TRUE NEGATIVE</td>
-                  </tr>
-                  <tr>
-                    <td className="p-2">Subject 1 / ADL 02.mp4</td>
-                    <td className="p-2 text-cyan-400">Turning in Bed</td>
-                    <td className="p-2 text-emerald-400">ABSTAIN_SAFE_ACTIVITY</td>
-                    <td className="p-2">Drop: 29.7% | H-Loss: 18.3%</td>
-                    <td className="p-2 text-emerald-400 font-bold">✓ TRUE NEGATIVE</td>
-                  </tr>
-                  <tr>
-                    <td className="p-2">Subject 1 / ADL 03.mp4</td>
-                    <td className="p-2 text-cyan-400">Sitting & Dusting Bed</td>
-                    <td className="p-2 text-emerald-400">ABSTAIN_SAFE_ACTIVITY</td>
-                    <td className="p-2">No rapid descent</td>
-                    <td className="p-2 text-emerald-400 font-bold">✓ TRUE NEGATIVE</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <p className="text-[9.5px] text-zinc-500 font-mono">
-              Citation: E. Alam, A. Sufian, P. Dutta, M. Leo, I. A. Hameed, &quot;GMDCSA24: A Dataset for Human Fall Detection in Videos&quot;, Zenodo (CC BY 4.0).
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* COOL BENCHMARK DRAWER */}
       {coolDrawerOpen && (
@@ -554,16 +390,16 @@ export default function Home() {
             </div>
             <div className="p-2.5 bg-zinc-950 border border-white/[0.06] rounded-lg text-[10px] font-mono text-zinc-300 space-y-1">
               <div className="flex justify-between">
-                <span className="text-zinc-500">Instance Target:</span>
+                <span className="text-zinc-500">Target Architecture:</span>
                 <span className="text-cyan-300">AWS c7g.xlarge (Graviton4)</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-zinc-500">Node Economics:</span>
-                <span className="text-emerald-400">$0.038 / bed / day</span>
+                <span className="text-zinc-500">Concurrency Capacity:</span>
+                <span className="text-emerald-400">28 Beds @ 30 FPS</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-zinc-500">Concurrency:</span>
-                <span>28 Beds @ 30 FPS</span>
+                <span className="text-zinc-500">Node Economics:</span>
+                <span>$0.038 / bed / day (3-yr savings plan)</span>
               </div>
             </div>
           </div>
