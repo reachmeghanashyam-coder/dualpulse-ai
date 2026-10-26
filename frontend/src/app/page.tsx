@@ -10,6 +10,9 @@ import {
   CheckCircle,
   Loader2,
   Camera,
+  Play,
+  Pause,
+  RotateCcw,
 } from "lucide-react";
 
 interface KinematicsState {
@@ -59,7 +62,8 @@ export default function Home() {
     agent: { dispatches: [] },
   });
 
-  const [activeClip, setActiveClip] = useState<string | null>(null);
+  const [activeClip, setActiveClip] = useState<string>("FALL_STANDING");
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [liveStreamFrame, setLiveStreamFrame] = useState<string | null>(null);
   const [backendConnected, setBackendConnected] = useState<boolean>(false);
   const [coolDrawerOpen, setCoolDrawerOpen] = useState<boolean>(false);
@@ -109,11 +113,11 @@ export default function Home() {
   };
 
   useEffect(() => {
-    // Put backend in clean STANDBY mode on fresh page load/refresh
+    // Start backend paused on Frame 0 of FALL_STANDING so real clinical thumbnail is immediately visible
     fetch("http://localhost:8000/api/eval/clip", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clip_id: "STANDBY" }),
+      body: JSON.stringify({ clip_id: "FALL_STANDING", play: false }),
     }).catch(() => {});
 
     let ws: WebSocket | null = null;
@@ -124,6 +128,9 @@ export default function Home() {
         try {
           const data = JSON.parse(event.data);
           setTelemetry(data);
+          if (data.is_playing !== undefined) {
+            setIsPlaying(Boolean(data.is_playing));
+          }
           if (data.video_frame_b64) {
             setLiveStreamFrame(`data:image/jpeg;base64,${data.video_frame_b64}`);
           }
@@ -146,14 +153,29 @@ export default function Home() {
     };
   }, []);
 
-  const handleSelectClip = async (clipId: string) => {
+  const handleSelectClip = async (clipId: string, play: boolean = true) => {
     setActiveClip(clipId);
+    setIsPlaying(play);
     try {
       await fetch("http://localhost:8000/api/eval/clip", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clip_id: clipId }),
+        body: JSON.stringify({ clip_id: clipId, play }),
       });
+    } catch {}
+  };
+
+  const handlePlay = async () => {
+    setIsPlaying(true);
+    try {
+      await fetch("http://localhost:8000/api/eval/play", { method: "POST" });
+    } catch {}
+  };
+
+  const handlePause = async () => {
+    setIsPlaying(false);
+    try {
+      await fetch("http://localhost:8000/api/eval/pause", { method: "POST" });
     } catch {}
   };
 
@@ -215,10 +237,10 @@ export default function Home() {
         {/* SELECTOR BAR */}
         <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-mono uppercase text-zinc-400 tracking-wider">Trigger Scenario:</span>
+            <span className="text-xs font-mono uppercase text-zinc-400 tracking-wider">Scenarios:</span>
             
             <button
-              onClick={() => handleSelectClip("FALL_STANDING")}
+              onClick={() => handleSelectClip("FALL_STANDING", true)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 border ${
                 activeClip === "FALL_STANDING"
                   ? "bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.25)] ring-1 ring-rose-500/50"
@@ -230,7 +252,7 @@ export default function Home() {
             </button>
 
             <button
-              onClick={() => handleSelectClip("FALL_CHAIR")}
+              onClick={() => handleSelectClip("FALL_CHAIR", true)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 border ${
                 activeClip === "FALL_CHAIR"
                   ? "bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.25)] ring-1 ring-rose-500/50"
@@ -242,7 +264,7 @@ export default function Home() {
             </button>
 
             <button
-              onClick={() => handleSelectClip("WEBCAM")}
+              onClick={() => handleSelectClip("WEBCAM", true)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 border ${
                 activeClip === "WEBCAM"
                   ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-[0_0_15px_rgba(0,229,255,0.25)]"
@@ -253,12 +275,24 @@ export default function Home() {
               <span>Live USB Camera</span>
             </button>
 
-            {activeClip && activeClip !== "STANDBY" && (
+            {/* Play / Pause Toggle Button */}
+            {isPlaying ? (
               <button
-                onClick={() => handleSelectClip("STANDBY")}
-                className="px-2.5 py-1.5 rounded-lg text-[11px] font-mono transition-all text-zinc-400 hover:text-zinc-200 bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.05]"
+                onClick={handlePause}
+                className="px-2.5 py-1.5 rounded-lg text-xs font-mono transition-all text-amber-300 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 flex items-center gap-1"
+                title="Pause Evaluation"
               >
-                <span>Reset to Standby</span>
+                <Pause className="h-3 w-3 fill-amber-300" />
+                <span>Pause</span>
+              </button>
+            ) : (
+              <button
+                onClick={handlePlay}
+                className="px-2.5 py-1.5 rounded-lg text-xs font-mono transition-all text-cyan-300 bg-cyan-500/15 border border-cyan-500/40 hover:bg-cyan-500/25 flex items-center gap-1 shadow-[0_0_10px_rgba(0,229,255,0.2)]"
+                title="Play Evaluation"
+              >
+                <Play className="h-3 w-3 fill-cyan-300" />
+                <span>Play Scenario</span>
               </button>
             )}
           </div>
@@ -266,15 +300,15 @@ export default function Home() {
           {/* DYNAMIC STATUS BADGE */}
           <span
             className={`px-3 py-1 rounded-full text-xs font-bold font-mono border transition-all ${
-              !activeClip || activeClip === "STANDBY"
+              !isPlaying
                 ? "bg-cyan-500/10 text-cyan-400 border-cyan-500/30"
                 : isFall
                 ? "bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.3)] animate-pulse"
                 : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
             }`}
           >
-            {!activeClip || activeClip === "STANDBY"
-              ? "⏸ SENTINEL STANDBY"
+            {!isPlaying
+              ? "⏸ PAUSED (FRAME 0) // CLICK TO PLAY"
               : isFall
               ? "🚨 PATIENT FALL DETECTED"
               : "✓ MONITORING ACTIVE"}
@@ -286,7 +320,7 @@ export default function Home() {
           
           {/* LEFT: REAL OPENCV VIDEO STREAM */}
           <div className="lg:col-span-8 flex flex-col justify-between gap-2 h-full min-h-0">
-            <div className="relative rounded-xl bg-black border border-white/[0.08] overflow-hidden flex-1 min-h-0 flex items-center justify-center shadow-xl">
+            <div className="relative rounded-xl bg-black border border-white/[0.08] overflow-hidden flex-1 min-h-0 flex items-center justify-center shadow-xl group">
               {liveStreamFrame ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -297,7 +331,23 @@ export default function Home() {
               ) : (
                 <div className="flex flex-col items-center justify-center text-zinc-500 text-xs font-mono gap-2">
                   <Loader2 className="h-6 w-6 animate-spin text-cyan-400" />
-                  <span>Connecting to OpenCV 5 Stream...</span>
+                  <span>Loading Real Dataset Footage...</span>
+                </div>
+              )}
+
+              {/* PAUSED THUMBNAIL OVERLAY */}
+              {!isPlaying && liveStreamFrame && (
+                <div
+                  onClick={handlePlay}
+                  className="absolute inset-0 bg-black/35 backdrop-blur-[1px] flex flex-col items-center justify-center gap-2.5 transition-all cursor-pointer hover:bg-black/25"
+                >
+                  <div className="h-14 w-14 rounded-full bg-cyan-500/20 border border-cyan-400/80 flex items-center justify-center shadow-[0_0_25px_rgba(0,229,255,0.4)] group-hover:scale-105 transition-all">
+                    <Play className="h-6 w-6 text-cyan-300 ml-0.5 fill-cyan-300" />
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xs font-mono font-bold tracking-wider text-white uppercase">Click to Run Sentinel</div>
+                    <div className="text-[11px] font-mono text-zinc-400">or click a scenario button to start playback from 0.0s</div>
+                  </div>
                 </div>
               )}
 
@@ -312,15 +362,13 @@ export default function Home() {
             <div className="h-9 w-full bg-[#07090e] rounded-lg border border-white/[0.06] px-3 flex items-center justify-between text-[11px] font-mono">
               <span className="text-cyan-400">TELEMETRY:</span>
               <span className="text-zinc-300 truncate max-w-lg">
-                {!activeClip || activeClip === "STANDBY"
-                  ? "Sentinel armed on standby. Click [1. Standing Transfer Fall] or [2. Bedside Chair Fall] to start evaluation."
+                {!isPlaying
+                  ? "Holding at Frame 0 (Baseline posture). Click scenario button or Play to evaluate fall kinematics."
                   : isFall
                   ? "Impact detected! Downward velocity threshold crossed. Alert dispatched."
                   : "Patient posture within normal limits. Monitoring kinematic trajectory..."}
               </span>
-              <span className="text-zinc-500 text-[10px]">
-                {!activeClip || activeClip === "STANDBY" ? "Standby Radar" : "GMDCSA24 Real Footage"}
-              </span>
+              <span className="text-zinc-500 text-[10px]">GMDCSA24 Real Footage</span>
             </div>
           </div>
 
