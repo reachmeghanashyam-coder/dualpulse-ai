@@ -12,8 +12,38 @@ import {
   Camera,
 } from "lucide-react";
 
+interface KinematicsState {
+  drop_pct: number;
+  height_loss_pct: number;
+  is_fall: boolean;
+  is_abstained: boolean;
+}
+
+interface TelemetryState {
+  status: string;
+  breach_type: string;
+  kinematics: KinematicsState;
+  closed_loop_vision: Record<string, unknown>;
+  agent: Record<string, unknown>;
+  video_frame_b64?: string;
+}
+
+interface EhrDossier {
+  document_type?: string;
+  document_id?: string;
+  status?: string;
+  hospital_unit?: string;
+  room_id?: string;
+  generated_at?: string;
+  documented_incidents_count?: number;
+  cryptographic_proof?: {
+    algorithm?: string;
+    hash?: string;
+  };
+}
+
 export default function Home() {
-  const [telemetry, setTelemetry] = useState<Record<string, unknown>>({
+  const [telemetry, setTelemetry] = useState<TelemetryState>({
     status: "PATIENT_REST_NORMAL",
     breach_type: "NONE",
     kinematics: { drop_pct: 0.0, height_loss_pct: 0.0, is_fall: false, is_abstained: false },
@@ -33,9 +63,9 @@ export default function Home() {
   const [liveStreamFrame, setLiveStreamFrame] = useState<string | null>(null);
   const [backendConnected, setBackendConnected] = useState<boolean>(false);
   const [coolDrawerOpen, setCoolDrawerOpen] = useState<boolean>(false);
-  const [coolBenchmarkData, setCoolBenchmarkData] = useState<Record<string, unknown> | null>(null);
+  const [, setCoolBenchmarkData] = useState<Record<string, unknown> | null>(null);
   const [ehrModalOpen, setEhrModalOpen] = useState<boolean>(false);
-  const [ehrData, setEhrData] = useState<Record<string, unknown> | null>(null);
+  const [ehrData, setEhrData] = useState<EhrDossier | null>(null);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const lastAudioTriggerRef = useRef<number>(0);
@@ -157,7 +187,7 @@ export default function Home() {
   };
 
   const isFall = telemetry.status === "CRITICAL_INTERVENTION_REQUIRED";
-  const kin = (telemetry.kinematics as Record<string, unknown>) || {};
+  const kin = telemetry.kinematics;
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-[#030407] text-[#F5F5F7] font-sans flex flex-col justify-between px-6 py-4 box-border">
