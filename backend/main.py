@@ -1,5 +1,6 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional
 import asyncio
@@ -78,9 +79,10 @@ def get_clip_cap(clip_id: str):
         return cv2.VideoCapture(path)
     return None
 
-@app.get("/")
-def read_root():
+@app.get("/api/health")
+def health_check():
     return {
+        "status": "healthy",
         "system": "DualPulse AI Hospital Bed Fall Sentinel",
         "clip": CURRENT_STATE["clip_id"],
         "source": CURRENT_STATE["video_source"],
@@ -235,3 +237,9 @@ async def websocket_telemetry(websocket: WebSocket):
             
     except WebSocketDisconnect:
         pass
+
+# Mount static frontend export to serve full UI on same port
+frontend_out = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "out"))
+if os.path.exists(frontend_out):
+    app.mount("/", StaticFiles(directory=frontend_out, html=True), name="frontend")
+

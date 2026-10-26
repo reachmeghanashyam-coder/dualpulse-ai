@@ -45,6 +45,21 @@ interface EhrDossier {
   };
 }
 
+const getApiBase = () => {
+  if (typeof window !== "undefined") {
+    return window.location.origin;
+  }
+  return "http://localhost:8000";
+};
+
+const getWsUrl = () => {
+  if (typeof window !== "undefined") {
+    const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+    return `${proto}//${window.location.host}/ws/telemetry`;
+  }
+  return "ws://localhost:8000/ws/telemetry";
+};
+
 export default function Home() {
   const [telemetry, setTelemetry] = useState<TelemetryState>({
     status: "PATIENT_REST_NORMAL",
@@ -114,7 +129,7 @@ export default function Home() {
 
   useEffect(() => {
     // Start backend paused on Frame 0 of FALL_STANDING so real clinical thumbnail is immediately visible
-    fetch("http://localhost:8000/api/eval/clip", {
+    fetch(`${getApiBase()}/api/eval/clip`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ clip_id: "FALL_STANDING", play: false }),
@@ -122,7 +137,7 @@ export default function Home() {
 
     let ws: WebSocket | null = null;
     try {
-      ws = new WebSocket("ws://localhost:8000/ws/telemetry");
+      ws = new WebSocket(getWsUrl());
       ws.onopen = () => setBackendConnected(true);
       ws.onmessage = (event) => {
         try {
@@ -157,7 +172,7 @@ export default function Home() {
     setActiveClip(clipId);
     setIsPlaying(play);
     try {
-      await fetch("http://localhost:8000/api/eval/clip", {
+      await fetch(`${getApiBase()}/api/eval/clip`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ clip_id: clipId, play }),
@@ -168,26 +183,26 @@ export default function Home() {
   const handlePlay = async () => {
     setIsPlaying(true);
     try {
-      await fetch("http://localhost:8000/api/eval/play", { method: "POST" });
+      await fetch(`${getApiBase()}/api/eval/play`, { method: "POST" });
     } catch {}
   };
 
   const handlePause = async () => {
     setIsPlaying(false);
     try {
-      await fetch("http://localhost:8000/api/eval/pause", { method: "POST" });
+      await fetch(`${getApiBase()}/api/eval/pause`, { method: "POST" });
     } catch {}
   };
 
   const handleResolve = async () => {
     try {
-      await fetch("http://localhost:8000/api/patient/resolve", { method: "POST" });
+      await fetch(`${getApiBase()}/api/patient/resolve`, { method: "POST" });
     } catch {}
   };
 
   const handleDischarge = async () => {
     try {
-      const res = await fetch("http://localhost:8000/api/patient/discharge", { method: "POST" });
+      const res = await fetch(`${getApiBase()}/api/patient/discharge`, { method: "POST" });
       const data = await res.json();
       setEhrData(data.discharge_dossier);
       setEhrModalOpen(true);
@@ -196,7 +211,7 @@ export default function Home() {
 
   const fetchCoolBenchmarks = async () => {
     try {
-      const res = await fetch("http://localhost:8000/api/benchmarks/cool");
+      const res = await fetch(`${getApiBase()}/api/benchmarks/cool`);
       const data = await res.json();
       setCoolBenchmarkData(data);
     } catch {

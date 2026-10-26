@@ -40,3 +40,7 @@ Thumbs.db
 
 # Inspection scratch
 tmp_inspect/
+
+cloudflared.exe
+frontend/out/
+
