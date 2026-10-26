@@ -1,7 +1,8 @@
 # DualPulse AI: Closed-Loop Real-Footage Patient Sentinel
 > **Deterministic Kinematic Fall Detection & False-Alarm Suppression for Hospital Safety**  
 > *OpenCV AI Competition 2026 (powered by AWS)*  
-> **Target Tracks:** Grand Prize ($5,000) • Best Use of COOL Award ($1,000) • Agentic Vision Award ($1,000)
+> **Target Tracks:** Grand Prize ($5,000) • Best Use of COOL Award ($1,000) • Agentic Vision Award ($1,000)  
+> 🎬 **Live Video Demo:** [Watch on YouTube](https://youtu.be/RA5yW_VH4uI)
 
 ---
 
