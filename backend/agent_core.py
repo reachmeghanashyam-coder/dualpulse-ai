@@ -16,6 +16,10 @@ class ArchivalHospitalAgent:
         self.last_abstain_log_time = 0.0
         self.escalation_log = []
         
+    def reset(self):
+        self.last_dispatch_time = 0.0
+        self.last_abstain_log_time = 0.0
+        
     def evaluate(self, telemetry: Dict[str, Any], patient: Dict[str, Any]) -> Dict[str, Any]:
         now = time.time()
         breach = telemetry.get("breach_type", "NONE")

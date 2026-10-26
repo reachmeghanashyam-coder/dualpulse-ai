@@ -128,7 +128,7 @@ class RealFootageVisionEngine:
         active_bbox = None
         if contours and self.frame_count > 12: # Allow background model to warm up
             # Filter contours by minimum patient body mass
-            valid_cnts = [c for c in contours if cv2.contourArea(c) > (0.012 * target_w * target_h)]
+            valid_cnts = [c for c in contours if cv2.contourArea(c) > (0.011 * target_w * target_h)]
             if valid_cnts:
                 largest_c = max(valid_cnts, key=cv2.contourArea)
                 x, y, w, h = cv2.boundingRect(largest_c)
@@ -155,8 +155,8 @@ class RealFootageVisionEngine:
         else:
             self.consecutive_alert_frames = 0
 
-        # Require 3 consecutive confirmed fall frames to reject 1-frame segmentation noise
-        confirmed_fall = (self.consecutive_alert_frames >= 3)
+        # Require 2 consecutive confirmed fall frames to reject transient 1-frame segmentation flicker
+        confirmed_fall = (self.consecutive_alert_frames >= 2)
 
         if confirmed_fall or self.alarm_latched:
             if confirmed_fall and not self.alarm_latched:
@@ -233,7 +233,7 @@ class RealFootageVisionEngine:
                 best_idx_j = j
                 
         # Fall criteria calibrated to real biomechanical descent:
-        # Requires genuine vertical drop AND substantial loss of standing/seated height
+        # Requires genuine vertical drop AND post-impact resting stillness
         is_fall = False
         is_abstained = False
         
@@ -246,14 +246,14 @@ class RealFootageVisionEngine:
             post_ar = float(np.mean(ar[best_idx_j : best_idx_j + max(3, int(0.5 * self.fps))]))
             
             # Ground-truth fall: 
-            # Case A: Rapid standing collapse (person loses > 25% height and drops > 20% down to floor)
-            # Case B: Chair slide collapse (person slides down > 13% and loses > 20% seated height)
-            standing_collapse = (best_drop >= 0.20 and best_h_loss >= 0.25)
-            chair_collapse = (best_drop >= 0.13 and best_h_loss >= 0.20 and post_still)
+            # Case A: Rapid standing collapse (person loses standing height and drops down)
+            # Case B: Chair slide collapse (person slides down > 11.5% with height loss >= 18% and settles)
+            standing_collapse = (best_drop >= 0.17 and best_h_loss >= 0.18)
+            chair_collapse = (best_drop >= 0.115 and best_h_loss >= 0.18 and post_still)
 
             if (standing_collapse or chair_collapse) and post_still:
                 is_fall = True
-            elif best_drop > 0.10:
+            elif best_drop > 0.09:
                 is_abstained = True
                 
         return {

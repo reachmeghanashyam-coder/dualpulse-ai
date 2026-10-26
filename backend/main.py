@@ -85,6 +85,7 @@ def read_root():
 def set_clip(cmd: ClipCommand):
     global current_cap, webcam_cap
     engine.reset()
+    agent.reset()
     CURRENT_STATE["clip_id"] = cmd.clip_id
     
     if cmd.clip_id == "WEBCAM":
@@ -118,6 +119,7 @@ def resolve_incident():
         "patient_id": active_patient.patient_id
     })
     engine.reset()
+    agent.reset()
     if current_cap is not None:
         current_cap.release()
     current_cap = get_clip_cap(CURRENT_STATE["clip_id"])
@@ -160,6 +162,8 @@ async def websocket_telemetry(websocket: WebSocket):
                 if not ret or video_f is None:
                     current_cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                     ret, video_f = current_cap.read()
+                    engine.reset()
+                    agent.reset()
                 if ret and video_f is not None:
                     frame = video_f
                     
