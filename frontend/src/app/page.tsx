@@ -59,7 +59,7 @@ export default function Home() {
     agent: { dispatches: [] },
   });
 
-  const [activeClip, setActiveClip] = useState<string>("FALL_STANDING");
+  const [activeClip, setActiveClip] = useState<string | null>(null);
   const [liveStreamFrame, setLiveStreamFrame] = useState<string | null>(null);
   const [backendConnected, setBackendConnected] = useState<boolean>(false);
   const [coolDrawerOpen, setCoolDrawerOpen] = useState<boolean>(false);
@@ -109,11 +109,11 @@ export default function Home() {
   };
 
   useEffect(() => {
-    // Reset backend clip state on fresh page load/refresh
+    // Put backend in clean STANDBY mode on fresh page load/refresh
     fetch("http://localhost:8000/api/eval/clip", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clip_id: "FALL_STANDING" }),
+      body: JSON.stringify({ clip_id: "STANDBY" }),
     }).catch(() => {});
 
     let ws: WebSocket | null = null;
@@ -215,14 +215,14 @@ export default function Home() {
         {/* SELECTOR BAR */}
         <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-mono uppercase text-zinc-400 tracking-wider">Test Fall:</span>
+            <span className="text-xs font-mono uppercase text-zinc-400 tracking-wider">Trigger Scenario:</span>
             
             <button
               onClick={() => handleSelectClip("FALL_STANDING")}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 border ${
                 activeClip === "FALL_STANDING"
-                  ? "bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.25)]"
-                  : "bg-white/[0.02] text-zinc-300 border-white/[0.06] hover:text-white"
+                  ? "bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.25)] ring-1 ring-rose-500/50"
+                  : "bg-white/[0.02] text-zinc-300 border-white/[0.06] hover:text-white hover:border-rose-500/30"
               }`}
             >
               <ShieldAlert className="h-3.5 w-3.5 text-rose-400" />
@@ -233,8 +233,8 @@ export default function Home() {
               onClick={() => handleSelectClip("FALL_CHAIR")}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 border ${
                 activeClip === "FALL_CHAIR"
-                  ? "bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.25)]"
-                  : "bg-white/[0.02] text-zinc-300 border-white/[0.06] hover:text-white"
+                  ? "bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.25)] ring-1 ring-rose-500/50"
+                  : "bg-white/[0.02] text-zinc-300 border-white/[0.06] hover:text-white hover:border-rose-500/30"
               }`}
             >
               <ShieldAlert className="h-3.5 w-3.5 text-rose-400" />
@@ -245,24 +245,39 @@ export default function Home() {
               onClick={() => handleSelectClip("WEBCAM")}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 border ${
                 activeClip === "WEBCAM"
-                  ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/50"
+                  ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-[0_0_15px_rgba(0,229,255,0.25)]"
                   : "bg-white/[0.02] text-zinc-300 border-white/[0.06] hover:text-white"
               }`}
             >
               <Camera className="h-3.5 w-3.5 text-cyan-400" />
               <span>Live USB Camera</span>
             </button>
+
+            {activeClip && activeClip !== "STANDBY" && (
+              <button
+                onClick={() => handleSelectClip("STANDBY")}
+                className="px-2.5 py-1.5 rounded-lg text-[11px] font-mono transition-all text-zinc-400 hover:text-zinc-200 bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.05]"
+              >
+                <span>Reset to Standby</span>
+              </button>
+            )}
           </div>
 
           {/* DYNAMIC STATUS BADGE */}
           <span
             className={`px-3 py-1 rounded-full text-xs font-bold font-mono border transition-all ${
-              isFall
+              !activeClip || activeClip === "STANDBY"
+                ? "bg-cyan-500/10 text-cyan-400 border-cyan-500/30"
+                : isFall
                 ? "bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.3)] animate-pulse"
                 : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
             }`}
           >
-            {isFall ? "🚨 PATIENT FALL DETECTED" : "✓ MONITORING ACTIVE"}
+            {!activeClip || activeClip === "STANDBY"
+              ? "⏸ SENTINEL STANDBY"
+              : isFall
+              ? "🚨 PATIENT FALL DETECTED"
+              : "✓ MONITORING ACTIVE"}
           </span>
         </div>
 
@@ -297,11 +312,15 @@ export default function Home() {
             <div className="h-9 w-full bg-[#07090e] rounded-lg border border-white/[0.06] px-3 flex items-center justify-between text-[11px] font-mono">
               <span className="text-cyan-400">TELEMETRY:</span>
               <span className="text-zinc-300 truncate max-w-lg">
-                {isFall
+                {!activeClip || activeClip === "STANDBY"
+                  ? "Sentinel armed on standby. Click [1. Standing Transfer Fall] or [2. Bedside Chair Fall] to start evaluation."
+                  : isFall
                   ? "Impact detected! Downward velocity threshold crossed. Alert dispatched."
-                  : "Patient posture within normal limits. Standing by for impact event..."}
+                  : "Patient posture within normal limits. Monitoring kinematic trajectory..."}
               </span>
-              <span className="text-zinc-500 text-[10px]">GMDCSA24 Real Footage</span>
+              <span className="text-zinc-500 text-[10px]">
+                {!activeClip || activeClip === "STANDBY" ? "Standby Radar" : "GMDCSA24 Real Footage"}
+              </span>
             </div>
           </div>
 
